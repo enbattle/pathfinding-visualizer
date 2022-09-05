@@ -1,0 +1,191 @@
+html {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* General styles */
+.text-center {
+  text-align: center;
+}
+
+/* Container styles */
+.container {
+  display: flex;
+}
+
+/* Menu styles */
+.menu {
+  border: 5px solid blue;
+  border-radius: 1em;
+  box-shadow: -10px 10px skyblue;
+  margin: auto 1vw;
+  padding: 1vh 1vw;
+  width: 15vw;
+  overflow-x: hidden;
+}
+
+/* Maze styles */
+.board-padding {
+  padding: 1.5vw;
+  border-radius: 1rem;
+}
+
+.columns {
+  border: 5px solid black;
+}
+
+.start {
+  background-color: orange;
+  border-radius: 1rem;
+}
+
+.goal {
+  background-color: orange;
+  border-radius: 1rem;
+}
+
+.no-path {
+  color: red;
+}
+
+/* Search path line  */
+.vertical-path {
+  background: linear-gradient(90deg, yellow 0%, yellow 33.3%, black 33.3%, black 66.6%, yellow 66.6%, yellow 100%);
+}
+
+.horizontal-path {
+  background: linear-gradient(180deg, yellow 0%, yellow 33.3%, black 33.3%, black 66.6%, yellow 66.6%, yellow 100%);
+}
+
+.right-to-up-path {
+  background:
+    linear-gradient(90deg, transparent 0%, transparent 66.6%, yellow 66.6%, yellow 100%),
+    linear-gradient(180deg, transparent 0%, transparent 66.6%, yellow 66.6%, yellow 100%),
+    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+}
+
+.left-to-up-path {
+  background:
+    linear-gradient(90deg, yellow 0%, yellow 33.3%, transparent 33.3%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, transparent 66.6%, yellow 66.6%, yellow 100%),
+    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+}
+
+.right-to-down-path {
+  background: 
+    linear-gradient(90deg, transparent 0%, transparent 66.6%, yellow 66.6%, yellow 100%),
+    linear-gradient(180deg, yellow 0%, yellow 33.3%, transparent 33.3%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+}
+
+.left-to-down-path {
+  background:
+    linear-gradient(90deg, yellow 0%, yellow 33.3%, transparent 33.3%, transparent 100%),
+    linear-gradient(180deg, yellow 0%, yellow 33.3%, transparent 33.3%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+}
+
+/* Search path fill animations */
+.board-fill {
+  animation-name: boardfill;
+  animation-duration: 0.25s; 
+  animation-timing-function: ease-out; 
+  animation-delay: 0;
+  animation-direction: alternate;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  animation-play-state: running;
+}
+
+.end-path-fill {
+  animation-name: endfill;
+  animation-duration: 0.25s; 
+  animation-timing-function: ease-out; 
+  animation-delay: 0;
+  animation-direction: alternate;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  animation-play-state: running;
+}
+
+.wall-fill {
+  animation-name: wallfill;
+  animation-duration: 0.25s; 
+  animation-timing-function: ease-out; 
+  animation-delay: 0;
+  animation-direction: alternate;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  animation-play-state: running;
+}
+
+@keyframes boardfill {
+  0% {
+    transform: scale(.3);
+    background-color: skyblue;
+    border-radius: 100%;
+  }
+  50% {
+    background-color: skyblue;
+  }
+  100% {
+    transform: scale(1);
+    background-color: blue;
+    font-weight: bolder;
+    font-size: large;
+  }
+}
+
+@keyframes endfill {
+  0% {
+    transform: scale(.3);
+    background-color: red;
+    border-radius: 100%;
+  }
+  50% {
+    background-color: orange;
+  }
+  100% {
+    transform: scale(1);
+    background-color:yellow;
+  }
+}
+
+@keyframes wallfill {
+  0% {
+    transform: scale(.3);
+    background-color: darkgray;
+    border-radius: 100%;
+  }
+  50% {
+    background-color: darkgray;
+  }
+  100% {
+    transform: scale(1);
+    background-color:darkgray;
+  }
+}
+
+/*
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+*/
+
+/*
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+*/
