@@ -56,6 +56,18 @@ select:-ms-expand {
   text-align: center;
 }
 
+.text-start {
+  text-align: start;
+}
+
+.text-end {
+  text-align:end;
+}
+
+.text-center {
+  text-align: center;
+}
+
 .d-flex {
   display: flex;
 }
@@ -138,6 +150,29 @@ select:-ms-expand {
 .menu-title {
   font-size: 1.5rem;
   color: var(--text-color);
+}
+
+.menu-info {
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  fill: greenyellow;
+  cursor: help;
+}
+
+.menu-info:hover {
+  fill: darkgreen;
+}
+
+.menu-icon {
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  color: greenyellow;
 }
 
 /* Algorithm select styles */
