@@ -221,7 +221,7 @@ const Board = ({
 			setShouldBuildWalls(false);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [shouldBuildWalls, wallAlgorithm, timeoutIdsRef]);
+	}, [shouldBuildWalls, timeoutIdsRef]);
 
 	// Check if algorithm can/should be run
 	React.useEffect(() => {
@@ -281,4 +281,27 @@ const Board = ({
 	);
 }
 
-export default Board;
+const BoardConfigurationsAreEqual = (prevProps: IBoardParameters, nextProps: IBoardParameters) => {
+	const {
+		shouldBuildWalls: prevBuildWalls,
+		shouldVisualizePathAlgorithm: prevVisualizePath,
+		shouldResetPath: prevResetPath,
+		shouldResetBoard: prevResetBoard
+	} = prevProps;
+
+	const {
+		shouldBuildWalls: nextBuildWalls,
+		shouldVisualizePathAlgorithm: nextVisualizePath,
+		shouldResetPath: nextResetPath,
+		shouldResetBoard: nextResetBoard
+	} = nextProps;
+
+	return prevBuildWalls === nextBuildWalls &&
+	prevVisualizePath === nextVisualizePath &&
+	prevResetPath === nextResetPath &&
+	prevResetBoard === nextResetBoard
+}
+
+const BoardMemo = React.memo(Board, BoardConfigurationsAreEqual);
+
+export default BoardMemo;

@@ -1,5 +1,5 @@
 import React from "react";
-import Board from "./board";
+import BoardMemo from "./board";
 import { randIntBetween } from '../util/function-util';
 import { CoordinateAndDirection } from "../models/models";
 import { AiFillInfoCircle } from 'react-icons/ai';
@@ -22,6 +22,7 @@ const modalStyle = {
   border: '1px solid greenyellow',
   boxShadow: 24,
   p: 4,
+	borderRadius: 5
 };
 
 const Configuration = () => {
@@ -166,7 +167,7 @@ const Configuration = () => {
 			</div>
 
 			{/* Board Area */}
-			<Board 
+			<BoardMemo 
 				rows={rows}
 				columns={columns}
 				startCoordinate={startCoordinate}
