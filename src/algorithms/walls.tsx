@@ -1,5 +1,5 @@
 import { evenRandIntBetween, oddRandIntBetween } from '../util/function-util';
-import { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection } from "../models/models";
 
 /**
  * 

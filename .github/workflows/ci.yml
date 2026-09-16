@@ -27,5 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test -- --watchAll=false --passWithNoTests
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:run
       - run: npm run build

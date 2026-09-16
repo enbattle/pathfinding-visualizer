@@ -1,4 +1,4 @@
-import { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection } from "../models/models";
 
 /**
  * 

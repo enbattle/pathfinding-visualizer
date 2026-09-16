@@ -4,7 +4,7 @@ import {
 	unweightedSearch
 } from '../algorithms/paths';
 import { drawBorderWalls, recursiveDivision, recursiveDivisionTwoLayers } from '../algorithms/walls';
-import { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection } from "../models/models";
 
 interface IBoardParameters {
 	rows: number;
@@ -54,9 +54,9 @@ const Board = ({
 			let addingWall: boolean;
 
 			// ID of each board coordinate is in the string form "row_column"
-			let boardCoordinates = event.target.id.split("_");
-			let currentRow = parseInt(boardCoordinates[0]);
-			let currentColumn = parseInt(boardCoordinates[1]);
+			const boardCoordinates = event.target.id.split("_");
+			const currentRow = parseInt(boardCoordinates[0]);
+			const currentColumn = parseInt(boardCoordinates[1]);
 
 			// Show that the user clicked on a wall
 			if(boardRef.current[(currentRow * columns) + currentColumn].className.includes("wall-fill")) {
@@ -68,7 +68,7 @@ const Board = ({
 				addingWall = true;
 			}
 
-			let newWall = boardCoordinates[0] + "_" + boardCoordinates[1];
+			const newWall = boardCoordinates[0] + "_" + boardCoordinates[1];
 			if(addingWall) {
 				// Add wall to the set
 				walls.current.add(newWall);
@@ -86,7 +86,7 @@ const Board = ({
 			boardRef.current[(rowNum * columns) + columnNum].className += " wall-fill";
 		}
 
-		let newWall = rowNum.toString() + "_" + columnNum.toString();
+		const newWall = rowNum.toString() + "_" + columnNum.toString();
 		
 		// Add wall to the set
 		walls.current.add(newWall);
@@ -135,13 +135,13 @@ const Board = ({
 	}
 
 	// Creates the <rows> by <columns> board
-	const createBoard = (): JSX.Element[] => {
+	const createBoard = (): React.JSX.Element[] => {
 		// Initialize board
-		const maze: JSX.Element[] = [];
+		const maze: React.JSX.Element[] = [];
 
 		// Create board
 		for(let i=0; i<rows; i++) {
-			let cells: JSX.Element[] = [];
+			const cells: React.JSX.Element[] = [];
 			for(let j=0; j<columns; j++) {
 				if(i === startCoordinate.row && j === startCoordinate.column) { // Start
 					cells.push(

@@ -1,7 +1,7 @@
 import React from 'react';
 import { PriorityQueueAscend } from '../util/structure-util';
 import { getEuclideanDistance } from '../util/function-util';
-import { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection } from "../models/models";
 
 /**
  * 
@@ -11,11 +11,11 @@ import { CoordinateAndDirection } from "../models/models";
  * @returns array containing all the possible moves that can be made from the current position (only the 4 cardinal directions)
  */
 function findChildrenMoves(rows: number, columns: number, currentPosition: { row: number, column: number }): CoordinateAndDirection[] {
-  let childrenPositions: CoordinateAndDirection[] = [];
+  const childrenPositions: CoordinateAndDirection[] = [];
 
   // Top move
   if(currentPosition.row-1 >= 0) {
-    let children = {
+    const children = {
       row: currentPosition.row-1,
       column: currentPosition.column,
       direction: "up"
@@ -25,7 +25,7 @@ function findChildrenMoves(rows: number, columns: number, currentPosition: { row
     
   // Right move
   if(currentPosition.column+1 <= columns-1) {
-    let children = {
+    const children = {
       row: currentPosition.row,
       column: currentPosition.column+1,
       direction: "right"
@@ -35,7 +35,7 @@ function findChildrenMoves(rows: number, columns: number, currentPosition: { row
     
   // Down move
   if(currentPosition.row+1 <= rows-1) {
-    let children = {
+    const children = {
       row: currentPosition.row+1,
       column: currentPosition.column,
       direction: "down"
@@ -45,7 +45,7 @@ function findChildrenMoves(rows: number, columns: number, currentPosition: { row
     
   // Left move
   if(currentPosition.column-1 >= 0) {
-    let children = {
+    const children = {
       row: currentPosition.row,
       column: currentPosition.column-1,
       direction: "left"

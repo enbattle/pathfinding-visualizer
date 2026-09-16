@@ -88,7 +88,7 @@ export class PriorityQueueAscend {
 
 	// Push item into the priority queue, and sort it based on the comparator
 	push(item: any, priority: any) {
-		var newItem = new PriorityItem(item, priority);
+		const newItem = new PriorityItem(item, priority);
 		this.list.push(newItem);
 
 		// Sort using a comparator
@@ -118,7 +118,7 @@ export class PriorityQueueAscend {
 	}
 
 	printQueue() {
-		let queue: PriorityItem[] = [];
+		const queue: PriorityItem[] = [];
 		for (let i=0; i<this.list.length; i++) {
 				queue.push(this.list[i].priority);
 		}
@@ -140,7 +140,7 @@ export class PriorityQueueDescend {
 
 	// Push item into the priority, and then sort using the comparator
 	push(item: any, priority: any) {
-		var newItem = new PriorityItem(item, priority);
+		const newItem = new PriorityItem(item, priority);
 		this.list.push(newItem);
 
 		// Sort using a comparator
@@ -170,7 +170,7 @@ export class PriorityQueueDescend {
 	}
 
 	printQueue() {
-		let queue: PriorityItem[] = [];
+		const queue: PriorityItem[] = [];
 		for (let i=0; i<this.list.length; i++) {
 			queue.push(this.list[i].priority);
 		}

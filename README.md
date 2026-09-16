@@ -22,7 +22,7 @@ dependencies, builds the production bundle, and publishes it to GitHub
 Pages via `actions/deploy-pages`. This is the primary way the live site
 gets updated - it doesn't force-push or need local GitHub credentials.
 
-`npm run deploy` (which runs `gh-pages -d build`) is still available as a
+`npm run deploy` (which runs `gh-pages -d dist`) is still available as a
 manual local fallback that builds and pushes the production bundle to a
 `gh-pages` branch directly from your machine, for cases where you can't or
 don't want to use GitHub Actions.

@@ -1,7 +1,7 @@
 import React from "react";
 import BoardMemo from "./board";
 import { randIntBetween } from '../util/function-util';
-import { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection } from "../models/models";
 import { AiFillInfoCircle } from 'react-icons/ai';
 import { TbMoodCrazyHappy } from 'react-icons/tb';
 import { GiBrickWall, GiPathDistance, GiStairsGoal } from 'react-icons/gi';
