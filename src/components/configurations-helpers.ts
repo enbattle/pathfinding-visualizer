@@ -7,10 +7,26 @@ import type { CoordinateAndDirection } from '../models/models';
 // instead of leaving a gap or overflowing.
 export const CELL_SIZE_PX = 28;
 
-export function computeBoardSize(): { rows: number; columns: number } {
-  const rows = Math.floor(window.innerHeight / CELL_SIZE_PX) >= 20 ? Math.floor(window.innerHeight / CELL_SIZE_PX) : 20;
-  const columns = Math.floor(window.innerWidth / CELL_SIZE_PX) >= 20 ? Math.floor(window.innerWidth / CELL_SIZE_PX) : 20;
+// Shared floor-at-20 math, factored out so it can be applied either to the
+// raw window (first-paint guess, before anything has actually laid out) or
+// to a measured container's real content-box size (see
+// computeBoardSize below and its caller in configurations.tsx).
+export function computeBoardSizeFromDimensions(widthPx: number, heightPx: number): { rows: number; columns: number } {
+  const rows = Math.floor(heightPx / CELL_SIZE_PX) >= 20 ? Math.floor(heightPx / CELL_SIZE_PX) : 20;
+  const columns = Math.floor(widthPx / CELL_SIZE_PX) >= 20 ? Math.floor(widthPx / CELL_SIZE_PX) : 20;
   return { rows, columns };
+}
+
+// First-paint guess only, based on the full window - it ignores the side
+// panel/padding/gaps around the board, so it's always an overestimate of
+// the board's actual available space. configurations.tsx immediately
+// corrects this via a layout effect that measures the real board
+// container and calls computeBoardSizeFromDimensions with its actual size,
+// before the browser paints - this window-based guess only exists so
+// something renders on the very first render, before that container can be
+// measured.
+export function computeBoardSize(): { rows: number; columns: number } {
+  return computeBoardSizeFromDimensions(window.innerWidth, window.innerHeight);
 }
 
 // Placed one cell inside the outer border (drawn by drawBorderWalls) rather

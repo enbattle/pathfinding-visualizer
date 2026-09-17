@@ -581,18 +581,16 @@ const Board = ({
 	const board = createBoard();
 
 	return (
-		<div>
-			<div>
-
-				{/* Board area */}
-				<table className="mt-3 mr-2 ml-0 table-fixed">
-					<tbody>
-						{board}
-					</tbody>
-				</table>
-
-			</div>
-		</div>
+		// No margin/padding here by design - the parent's board-area container
+		// (configurations.tsx) measures its own content box via ResizeObserver
+		// and sizes rows/columns to match exactly; any margin here would make
+		// the table larger than that measurement and reintroduce the overflow
+		// scrollbar the measurement is meant to prevent.
+		<table className="table-fixed">
+			<tbody>
+				{board}
+			</tbody>
+		</table>
 	);
 }
 

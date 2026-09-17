@@ -165,8 +165,7 @@ describe('Configuration (component/integration)', () => {
   it('paint mode controls whether a click paints a wall or weighted terrain', () => {
     render(<Configuration />);
 
-    const paintModeSelect = screen.getByLabelText('Paint Mode Choices');
-    fireEvent.change(paintModeSelect, { target: { value: 'weight' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Weighted Terrain' }));
 
     // Any interactive empty cell works - grab one far from the anchors.
     const target = getCellById(10, 10);
