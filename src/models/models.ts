@@ -71,9 +71,10 @@ class PriorityItem<T> {
   }
 }
 
-// Shared binary-heap implementation backing both priority-queue orderings
-// below, so push/pop are O(log n) instead of a full array sort on every
-// insertion.
+// Binary-heap implementation backing the priority queue below, so push/pop
+// are O(log n) instead of a full array sort on every insertion. Abstract
+// rather than folded into PriorityQueueAscend directly so a descending-order
+// variant can be added later without re-implementing the heap.
 abstract class PriorityQueueHeap<T> {
   private heap: PriorityItem<T>[] = [];
 
@@ -152,15 +153,6 @@ class PriorityQueueAscend<T> extends PriorityQueueHeap<T> {
   }
 }
 
-/* Data structure where the policy corresponds to the priority associated with
-   each item in the queue. Utilizes the higher priority item first (descending
-   order) (market-highs, etc). */
-class PriorityQueueDescend<T> extends PriorityQueueHeap<T> {
-  protected comesBefore(a: PriorityItem<T>, b: PriorityItem<T>): boolean {
-    return a.priority > b.priority;
-  }
-}
-
 export type { CoordinateAndDirection, SearchNode };
 
-export { Stack, Queue, PriorityItem, PriorityQueueAscend, PriorityQueueDescend };
+export { Stack, Queue, PriorityItem, PriorityQueueAscend };

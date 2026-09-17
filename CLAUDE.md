@@ -24,11 +24,11 @@ GitHub Pages via `.github/workflows/deploy.yml`.
   guarantees every generated maze stays fully connected - keep that
   invariant if you touch the exclusion-zone logic.
 - `src/models/models.ts` - the typed data structures the algorithms run
-  on: `Stack`/`Queue`/`PriorityQueueAscend`/`PriorityQueueDescend` (the
-  two priority queues are a real binary heap, not a sort-per-push array -
-  keep it that way, it's the difference between O(n log n) and O(n² log n)
-  per search) and the `CoordinateAndDirection`/`SearchNode` types. New
-  generic data structures belong here, not back in a `util/` file.
+  on: `Stack`/`Queue`/`PriorityQueueAscend` (a real binary heap, not a
+  sort-per-push array - keep it that way, it's the difference between
+  O(n log n) and O(n² log n) per search) and the
+  `CoordinateAndDirection`/`SearchNode` types. New generic data structures
+  belong here, not back in a `util/` file.
 - `src/util/function-util.tsx` - small math/random helpers used by the
   algorithms above. `getEuclideanDistance` must return true (not squared)
   distance - A*'s shortest-path guarantee depends on it never

@@ -1,5 +1,63 @@
 import { describe, it, expect } from 'vitest';
-import { PriorityQueueAscend, PriorityQueueDescend } from './models';
+import { Stack, Queue, PriorityQueueAscend } from './models';
+
+describe('Stack', () => {
+  it('pops in last-in-first-out order', () => {
+    const stack = new Stack<string>();
+    stack.push('a');
+    stack.push('b');
+    stack.push('c');
+
+    expect(stack.pop()).toBe('c');
+    expect(stack.pop()).toBe('b');
+    expect(stack.pop()).toBe('a');
+  });
+
+  it('peek returns the top item without removing it', () => {
+    const stack = new Stack<number>();
+    stack.push(1);
+    stack.push(2);
+
+    expect(stack.peek()).toBe(2);
+    expect(stack.pop()).toBe(2);
+    expect(stack.peek()).toBe(1);
+  });
+
+  it('reports empty correctly and returns undefined when popped empty', () => {
+    const stack = new Stack<number>();
+    expect(stack.isEmpty()).toBe(true);
+    expect(stack.pop()).toBeUndefined();
+  });
+});
+
+describe('Queue', () => {
+  it('pops in first-in-first-out order', () => {
+    const queue = new Queue<string>();
+    queue.push('a');
+    queue.push('b');
+    queue.push('c');
+
+    expect(queue.pop()).toBe('a');
+    expect(queue.pop()).toBe('b');
+    expect(queue.pop()).toBe('c');
+  });
+
+  it('peek returns the front item without removing it', () => {
+    const queue = new Queue<number>();
+    queue.push(1);
+    queue.push(2);
+
+    expect(queue.peek()).toBe(1);
+    expect(queue.pop()).toBe(1);
+    expect(queue.peek()).toBe(2);
+  });
+
+  it('reports empty correctly and returns undefined when popped empty', () => {
+    const queue = new Queue<number>();
+    expect(queue.isEmpty()).toBe(true);
+    expect(queue.pop()).toBeUndefined();
+  });
+});
 
 describe('PriorityQueueAscend', () => {
   it('pops the lowest-priority item first across a mixed sequence of pushes', () => {
@@ -36,18 +94,5 @@ describe('PriorityQueueAscend', () => {
     const queue = new PriorityQueueAscend<number>();
     expect(queue.isEmpty()).toBe(true);
     expect(queue.pop()).toBeUndefined();
-  });
-});
-
-describe('PriorityQueueDescend', () => {
-  it('pops the highest-priority item first', () => {
-    const queue = new PriorityQueueDescend<string>();
-    queue.push('low', 1);
-    queue.push('high', 100);
-    queue.push('mid', 50);
-
-    expect(queue.pop()?.item).toBe('high');
-    expect(queue.pop()?.item).toBe('mid');
-    expect(queue.pop()?.item).toBe('low');
   });
 });

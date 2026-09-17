@@ -1,16 +1,7 @@
 import type { CoordinateAndDirection } from "../models/models";
 
 /**
- * 
- * @param max - maximum random value that can be returned
- * @returns random value between 0 and max
- */
-function randIntUpTo(max: number) {
-  return Math.floor(Math.random() * max);
-}
-
-/**
- * 
+ *
  * @param min - minimum random value that can be returned
  * @param max - maximum random value that can be returned
  * @returns random value between min (included) and max (included)
@@ -56,16 +47,6 @@ function oddRandIntBetween(min: number, max: number) {
 }
 
 /**
- * 
- * @param {*} current - current CoordinateAndDirection (has a row and column property to define position)
- * @param {*} end  = goal CoordinateAndDirection (has a row and column property to define position)
- * @returns Manhattan distance between the coordinates
- */
-function getManhattanDistance(current: CoordinateAndDirection, end: CoordinateAndDirection) {
-  return Math.abs(current.row - end.row) + Math.abs(current.column - end.column);
-}
-
-/**
  *
  * @param {*} current - current CoordinateAndDirection (has a row and column property to define position)
  * @param {*} end  = goal CoordinateAndDirection (has a row and column property to define position)
@@ -81,10 +62,8 @@ function getEuclideanDistance(current: CoordinateAndDirection, end: CoordinateAn
 }
 
 export {
-  randIntUpTo,
   randIntBetween,
   evenRandIntBetween,
   oddRandIntBetween,
-  getManhattanDistance,
   getEuclideanDistance
 };
