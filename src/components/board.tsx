@@ -3,9 +3,15 @@ import {
 	weightedSearch,
 	unweightedSearch
 } from '../algorithms/paths';
-import { drawBorderWalls, recursiveDivision, recursiveDivisionTwoLayers } from '../algorithms/walls';
+import { drawBorderWalls, recursiveDivision, recursiveDivisionTwoLayers, prims } from '../algorithms/walls';
 import type { CoordinateAndDirection } from "../models/models";
 import { cn } from '@/lib/utils';
+
+export interface RunStats {
+	visitedCount: number;
+	pathLength: number | null;
+	algorithmTimeMs: number;
+}
 
 interface IBoardParameters {
 	rows: number;
@@ -14,6 +20,8 @@ interface IBoardParameters {
 	goalCoordinate: CoordinateAndDirection;
 	pathAlgorithm: string;
 	wallAlgorithm: string;
+	paintMode: "wall" | "weight";
+	stepDelay: number;
 	shouldBuildWalls: boolean;
 	setShouldBuildWalls: (buildWallsState: boolean) => void;
 	shouldVisualizePathAlgorithm: boolean;
@@ -23,12 +31,17 @@ interface IBoardParameters {
 	shouldResetPath: boolean;
 	setShouldResetPath: (resetState: boolean) => void;
 	onError: (message: string | null) => void;
+	onStats: (stats: RunStats | null) => void;
 }
 
-type CellKind = "empty" | "wall" | "start" | "goal";
+type CellKind = "empty" | "wall" | "weight" | "start" | "goal";
+
+// Fixed extra traversal cost for a weighted-terrain cell (on top of the
+// baseline cost of 1 every cell has).
+const WEIGHT_VALUE = 5;
 
 // Full visual state for a single cell. `kind` is mutually exclusive
-// (a cell is exactly one of empty/wall/start/goal); visited/pathFill/
+// (a cell is exactly one of empty/wall/weight/start/goal); visited/pathFill/
 // pathDirectionClass are independent overlays the search animation adds
 // on top - a cell that was visited during search AND ends up on the final
 // path carries all three at once, mirroring the original's additive
@@ -73,6 +86,9 @@ function getCellClassName(cell: CellState): string {
 	if (cell.kind === "wall") {
 		classes.push("wall-fill");
 	}
+	if (cell.kind === "weight") {
+		classes.push("weight-fill");
+	}
 	if (cell.visited) {
 		classes.push("board-fill");
 	}
@@ -86,10 +102,23 @@ function getCellClassName(cell: CellState): string {
 	return cn(...classes);
 }
 
+// Finds the row/column encoded in a board cell's `id` ("row_column") under
+// a client point - used to figure out which cell a touch-move is currently
+// over, since touch events (unlike mouse) don't fire per-target as the
+// finger moves.
+function cellAtPoint(clientX: number, clientY: number): { row: number; column: number } | null {
+	const element = document.elementFromPoint(clientX, clientY);
+	const cell = element?.closest("td[id]");
+	if (!cell) return null;
+	const [row, column] = cell.id.split("_").map(Number);
+	if (Number.isNaN(row) || Number.isNaN(column)) return null;
+	return { row, column };
+}
+
 const Board = ({
 	rows, columns, startCoordinate, goalCoordinate, shouldBuildWalls, setShouldBuildWalls,
-	pathAlgorithm, wallAlgorithm, shouldVisualizePathAlgorithm, setShouldVisualizePathAlgorithm,
-	shouldResetBoard, setShouldResetBoard, shouldResetPath, setShouldResetPath, onError
+	pathAlgorithm, wallAlgorithm, paintMode, stepDelay, shouldVisualizePathAlgorithm, setShouldVisualizePathAlgorithm,
+	shouldResetBoard, setShouldResetBoard, shouldResetPath, setShouldResetPath, onError, onStats
 }: IBoardParameters) => {
 
 	// Contains all setTimeoutIds for the in-progress search animation, so an
@@ -99,6 +128,16 @@ const Board = ({
 
 	// Contains all the walls on the board
 	const walls = React.useRef<Set<string>>(new Set<string>());
+
+	// Contains all weighted-terrain cells and their traversal cost
+	const weights = React.useRef<Map<string, number>>(new Map<string, number>());
+
+	// Owns the *current* start/goal position (seeded from props, but then
+	// independent of them) so dragging a marker doesn't need to round-trip
+	// through the parent - props only matter again at the next full reset,
+	// where resetBoard() below re-seeds from them.
+	const [currentStart, setCurrentStart] = React.useState<CoordinateAndDirection>(startCoordinate);
+	const [currentGoal, setCurrentGoal] = React.useState<CoordinateAndDirection>(goalCoordinate);
 
 	const [cells, setCells] = React.useState<CellState[][]>(() =>
 		buildInitialCells(rows, columns, startCoordinate, goalCoordinate)
@@ -121,13 +160,33 @@ const Board = ({
 		timeoutIdsRef.current = [];
 	};
 
+	// Tracks which cells have already been counted, so a cell discovered as
+	// a child of multiple frontier nodes before it's actually popped (a
+	// normal search occurrence) only counts once toward the live stat.
+	const countedVisitedRef = React.useRef<Set<string>>(new Set());
+	// The single source of truth for the currently-displayed stats. Every
+	// onStats call reads/writes through this ref rather than constructing a
+	// fresh object inline, specifically so the *live* visitedCount ticks
+	// (fired repeatedly during animation, from handleCellVisited below)
+	// don't clobber pathLength/algorithmTimeMs back to their placeholder
+	// values - those are known synchronously, before the animation plays,
+	// and must survive every visitedCount update that follows.
+	const statsRef = React.useRef<RunStats>({ visitedCount: 0, pathLength: null, algorithmTimeMs: -1 });
+
 	const handleCellVisited = React.useCallback((row: number, column: number): void => {
+		const key = `${row}_${column}`;
+		if (!countedVisitedRef.current.has(key)) {
+			countedVisitedRef.current.add(key);
+			statsRef.current = { ...statsRef.current, visitedCount: statsRef.current.visitedCount + 1 };
+			onStats(statsRef.current);
+		}
+
 		setCells((prev) => {
 			const next = prev.map((r) => r.slice());
 			next[row][column] = { ...next[row][column], visited: true };
 			return next;
 		});
-	}, []);
+	}, [onStats]);
 
 	const handleGoalPathFill = React.useCallback((row: number, column: number): void => {
 		setCells((prev) => {
@@ -151,32 +210,49 @@ const Board = ({
 		onPathDirection: handlePathDirection
 	}), [handleCellVisited, handleGoalPathFill, handlePathDirection]);
 
-	// Add/remove a wall at a coordinate (click/tap toggle)
-	// if algorithm has already been run, you can't interact with the board again
-	const toggleWall = (row: number, column: number): void => {
-		if (shouldVisualizePathAlgorithm) return;
-
+	// Sets a single cell's paint state (empty/wall/weight), keeping the
+	// walls/weights refs and visual `kind` in sync and mutually exclusive.
+	const setPaintKind = React.useCallback((row: number, column: number, kind: "empty" | "wall" | "weight"): void => {
 		const key = `${row}_${column}`;
-		const isWall = walls.current.has(key);
-
-		if (isWall) {
-			walls.current.delete(key);
-		}
-		else {
+		walls.current.delete(key);
+		weights.current.delete(key);
+		if (kind === "wall") {
 			walls.current.add(key);
+		}
+		else if (kind === "weight") {
+			weights.current.set(key, WEIGHT_VALUE);
 		}
 
 		setCells((prev) => {
 			const next = prev.map((r) => r.slice());
-			next[row][column] = { ...next[row][column], kind: isWall ? "empty" : "wall" };
+			next[row][column] = { ...next[row][column], kind };
 			return next;
 		});
-	}
+	}, []);
 
-	// Add a wall to the board (no click event - used by the recursive wall algorithms)
+	// Add/remove a wall or weighted-terrain cell at a coordinate (single
+	// click/tap toggle) - if the algorithm has already been run, you can't
+	// interact with the board again until it's reset.
+	const togglePaint = React.useCallback((row: number, column: number): void => {
+		if (shouldVisualizePathAlgorithm) return;
+
+		const cell = cells[row]?.[column];
+		if (!cell) return;
+
+		if (cell.kind === "empty") {
+			setPaintKind(row, column, paintMode);
+		}
+		else if (cell.kind === "wall" || cell.kind === "weight") {
+			setPaintKind(row, column, "empty");
+		}
+	}, [cells, paintMode, setPaintKind, shouldVisualizePathAlgorithm]);
+
+	// Add a wall to the board (no click event - used by the recursive/Prim's
+	// wall algorithms)
 	const buildWall = (rowNum: number, columnNum: number): void => {
 		const key = `${rowNum}_${columnNum}`;
 		if (!walls.current.has(key)) {
+			weights.current.delete(key);
 			walls.current.add(key);
 			setCells((prev) => {
 				const next = prev.map((r) => r.slice());
@@ -189,12 +265,16 @@ const Board = ({
 	// Draw border walls and add inner walls recursively
 	const addRecursiveWalls = (): void => {
 		if(wallAlgorithm === "RecursiveDivision") {
-			drawBorderWalls(startCoordinate, goalCoordinate, rows, columns, buildWall);
-			recursiveDivision(0, startCoordinate, goalCoordinate, rows, columns, 1, 1, rows-2, columns-2, buildWall);
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
+			recursiveDivision(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
 		}
 		else if(wallAlgorithm === "RecursiveDivisionTwoLayers") {
-			drawBorderWalls(startCoordinate, goalCoordinate, rows, columns, buildWall);
-			recursiveDivisionTwoLayers(0, startCoordinate, goalCoordinate, rows, columns, 1, 1, rows-2, columns-2, buildWall);
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
+			recursiveDivisionTwoLayers(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
+		}
+		else if(wallAlgorithm === "Prims") {
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
+			prims(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
 		}
 	}
 
@@ -204,30 +284,179 @@ const Board = ({
 		let path = null;
 		if(shouldVisualizePathAlgorithm) {
 			onError(null);
+			countedVisitedRef.current = new Set();
+			statsRef.current = { visitedCount: 0, pathLength: null, algorithmTimeMs: -1 };
+			onStats(statsRef.current);
+
+			const startTime = performance.now();
 			if(pathAlgorithm === "BreadthFirstSearch") {
-				path = unweightedSearch(rows, columns, startCoordinate, goalCoordinate, walls.current, "BreadthFirstSearch", scheduleTimeout, animationCallbacks);
+				path = unweightedSearch(rows, columns, currentStart, currentGoal, walls.current, "BreadthFirstSearch", scheduleTimeout, animationCallbacks, stepDelay);
 			}
 			else if(pathAlgorithm === "DepthFirstSearch") {
-				path = unweightedSearch(rows, columns, startCoordinate, goalCoordinate, walls.current, "DepthFirstSearch", scheduleTimeout, animationCallbacks);
+				path = unweightedSearch(rows, columns, currentStart, currentGoal, walls.current, "DepthFirstSearch", scheduleTimeout, animationCallbacks, stepDelay);
 			}
 			else if(pathAlgorithm === "GreedyBestFirstSearch") {
-				path = weightedSearch(rows, columns, startCoordinate, goalCoordinate, walls.current, "GreedyBestFirstSearch", scheduleTimeout, animationCallbacks);
+				path = weightedSearch(rows, columns, currentStart, currentGoal, walls.current, weights.current, "GreedyBestFirstSearch", scheduleTimeout, animationCallbacks, stepDelay);
 			}
 			else if(pathAlgorithm === "DijkstrasAlgorithm") {
-				path = weightedSearch(rows, columns, startCoordinate, goalCoordinate, walls.current, "DijkstrasAlgorithm", scheduleTimeout, animationCallbacks);
+				path = weightedSearch(rows, columns, currentStart, currentGoal, walls.current, weights.current, "DijkstrasAlgorithm", scheduleTimeout, animationCallbacks, stepDelay);
 			}
 			else if(pathAlgorithm === "AStarAlgorithm") {
-				path = weightedSearch(rows, columns, startCoordinate, goalCoordinate, walls.current, "AStarAlgorithm", scheduleTimeout, animationCallbacks);
+				path = weightedSearch(rows, columns, currentStart, currentGoal, walls.current, weights.current, "AStarAlgorithm", scheduleTimeout, animationCallbacks, stepDelay);
 			}
+			const algorithmTimeMs = performance.now() - startTime;
 
 			if(path === null) {
 				onError("No path was found. Please try again.");
+				statsRef.current = { ...statsRef.current, pathLength: null, algorithmTimeMs };
 			}
 			else if(path.length === 0) {
 				onError("The start is the goal. Please try again.");
+				statsRef.current = { ...statsRef.current, pathLength: 0, algorithmTimeMs };
 			}
+			else {
+				statsRef.current = { ...statsRef.current, pathLength: path.length, algorithmTimeMs };
+			}
+			onStats(statsRef.current);
 		}
 	}
+
+	// --- Click/tap-and-drag paint + drag-to-move start/goal -----------------
+	//
+	// A single mousedown/touchstart on an interactive cell begins either a
+	// paint stroke (dragging paints/erases every empty-or-paintable cell the
+	// pointer subsequently enters) or, if it started on the start/goal
+	// marker, a move of that marker. The decision and the paint stroke's
+	// action ("add" vs "erase") are fixed for the whole gesture at
+	// pointerdown, matching ordinary drag-paint tool behavior rather than
+	// re-toggling every cell the pointer passes back over.
+	const dragStateRef = React.useRef<
+		| { kind: "paint"; action: "add" | "erase" }
+		| { kind: "move-start" | "move-goal" }
+		| null
+	>(null);
+
+	const canDropAnchor = (row: number, column: number): boolean => {
+		const cell = cells[row]?.[column];
+		if (!cell) return false;
+		if (row === currentGoal.row && column === currentGoal.column) return false;
+		if (row === currentStart.row && column === currentStart.column) return false;
+		return cell.kind === "empty" || cell.kind === "wall" || cell.kind === "weight";
+	};
+
+	const moveAnchor = (which: "start" | "goal", row: number, column: number): void => {
+		if (!canDropAnchor(row, column)) return;
+
+		const from = which === "start" ? currentStart : currentGoal;
+		const to: CoordinateAndDirection = { row, column, direction: "" };
+
+		setPaintKind(from.row, from.column, "empty");
+		walls.current.delete(`${row}_${column}`);
+		weights.current.delete(`${row}_${column}`);
+		setCells((prev) => {
+			const next = prev.map((r) => r.slice());
+			next[row][column] = { kind: which === "start" ? "start" : "goal", visited: false, pathFill: false, pathDirectionClass: null };
+			return next;
+		});
+
+		if (which === "start") {
+			setCurrentStart(to);
+		}
+		else {
+			setCurrentGoal(to);
+		}
+
+		// The just-run (or never-run) path/visited overlay may no longer be
+		// accurate against the new anchor position - clear it, but leave
+		// walls/weights the user painted alone.
+		cancelPendingTimeouts();
+		setCells((prev) => prev.map((r) => r.map((cell) => ({ ...cell, visited: false, pathFill: false, pathDirectionClass: null }))));
+	};
+
+	const handlePointerDownOnCell = (row: number, column: number): void => {
+		if (shouldVisualizePathAlgorithm) return;
+		const cell = cells[row]?.[column];
+		if (!cell) return;
+
+		if (cell.kind === "start") {
+			dragStateRef.current = { kind: "move-start" };
+		}
+		else if (cell.kind === "goal") {
+			dragStateRef.current = { kind: "move-goal" };
+		}
+		else if (cell.kind === "empty" || cell.kind === "wall" || cell.kind === "weight") {
+			dragStateRef.current = { kind: "paint", action: cell.kind === "empty" ? "add" : "erase" };
+			togglePaint(row, column);
+		}
+	};
+
+	const handlePointerEnterCell = (row: number, column: number): void => {
+		const drag = dragStateRef.current;
+		if (!drag || shouldVisualizePathAlgorithm) return;
+
+		if (drag.kind === "move-start") {
+			moveAnchor("start", row, column);
+		}
+		else if (drag.kind === "move-goal") {
+			moveAnchor("goal", row, column);
+		}
+		else if (drag.kind === "paint") {
+			const cell = cells[row]?.[column];
+			if (!cell) return;
+			if (drag.action === "add" && cell.kind === "empty") {
+				setPaintKind(row, column, paintMode);
+			}
+			else if (drag.action === "erase" && (cell.kind === "wall" || cell.kind === "weight")) {
+				setPaintKind(row, column, "empty");
+			}
+		}
+	};
+
+	const endDrag = (): void => {
+		dragStateRef.current = null;
+	};
+
+	// Tracks the drag via a single window-level mousemove + elementFromPoint
+	// (the same technique handleTouchMove below uses), rather than each
+	// cell's own onMouseEnter. Per-cell mouseenter is fragile here: in a
+	// fast synthetic/programmatic drag (and occasionally a fast real one),
+	// the browser can deliver mouseup before mouseenter reaches the target
+	// cell's listener, silently dropping the move. A single document-level
+	// listener that re-derives the cell under the cursor on every mousemove
+	// doesn't depend on that ordering at all.
+	const handleWindowMouseMove = (event: MouseEvent): void => {
+		if (!dragStateRef.current) return;
+		const target = cellAtPoint(event.clientX, event.clientY);
+		if (target) handlePointerEnterCell(target.row, target.column);
+	};
+
+	// Intentionally no dependency array: handlePointerEnterCell/endDrag are
+	// plain functions redefined every render (closing over the latest
+	// cells/currentStart/currentGoal/paintMode), so the listener is removed
+	// and re-added each render to always use the freshest closure rather
+	// than one captured from a stale render.
+	React.useEffect(() => {
+		window.addEventListener("mousemove", handleWindowMouseMove);
+		window.addEventListener("mouseup", endDrag);
+		return () => {
+			window.removeEventListener("mousemove", handleWindowMouseMove);
+			window.removeEventListener("mouseup", endDrag);
+		};
+	});
+
+	const handleTouchStartOnCell = (row: number, column: number) => (event: React.TouchEvent<HTMLTableCellElement>): void => {
+		event.preventDefault();
+		handlePointerDownOnCell(row, column);
+	};
+
+	const handleTouchMove = (event: React.TouchEvent<HTMLTableCellElement>): void => {
+		if (!dragStateRef.current) return;
+		event.preventDefault();
+		const touch = event.touches[0];
+		if (!touch) return;
+		const target = cellAtPoint(touch.clientX, touch.clientY);
+		if (target) handlePointerEnterCell(target.row, target.column);
+	};
 
 	// Creates the <rows> by <columns> board
 	const createBoard = (): React.JSX.Element[] => {
@@ -237,15 +466,18 @@ const Board = ({
 			const rowCells: React.JSX.Element[] = [];
 			for(let j=0; j<columns; j++) {
 				const cell = cells[i]?.[j] ?? { kind: "empty" as CellKind, visited: false, pathFill: false, pathDirectionClass: null };
-				const interactive = cell.kind === "empty" || cell.kind === "wall";
+				const isAnchor = cell.kind === "start" || cell.kind === "goal";
+				const interactive = cell.kind === "empty" || cell.kind === "wall" || cell.kind === "weight" || isAnchor;
 
 				rowCells.push(
 					<td
 						key={j}
 						id={i.toString() + "_" + j.toString()}
-						className={getCellClassName(cell)}
-						onClick={interactive ? () => toggleWall(i, j) : undefined}
-						onTouchEnd={interactive ? (event) => { event.preventDefault(); toggleWall(i, j); } : undefined}
+						className={cn(getCellClassName(cell), isAnchor && "cursor-grab")}
+						onMouseDown={interactive ? () => handlePointerDownOnCell(i, j) : undefined}
+						onTouchStart={interactive ? handleTouchStartOnCell(i, j) : undefined}
+						onTouchMove={interactive ? handleTouchMove : undefined}
+						onTouchEnd={interactive ? (event) => { event.preventDefault(); endDrag(); } : undefined}
 					>
 						{cell.kind === "start" ? "S" : cell.kind === "goal" ? "G" : null}
 					</td>
@@ -276,10 +508,14 @@ const Board = ({
 		clearAlgorithmState();
 	}
 
-	// Resets the entirety of the board (walls, paths, etc)
+	// Resets the entirety of the board (walls, weights, paths, and re-seeds
+	// the current start/goal position from the latest props).
 	const resetBoard = (): void => {
 		cancelPendingTimeouts();
 		walls.current.clear();
+		weights.current.clear();
+		setCurrentStart(startCoordinate);
+		setCurrentGoal(goalCoordinate);
 		setCells(buildInitialCells(rows, columns, startCoordinate, goalCoordinate));
 	}
 
@@ -319,6 +555,7 @@ const Board = ({
 			resetPath();
 			setShouldVisualizePathAlgorithm(false);
 			setShouldResetPath(false);
+			onStats(null);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [shouldResetPath]);
@@ -335,6 +572,7 @@ const Board = ({
 			setShouldResetPath(false);
 			setShouldBuildWalls(false);
 			setShouldResetBoard(false);
+			onStats(null);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [shouldResetBoard]);
@@ -347,7 +585,7 @@ const Board = ({
 			<div>
 
 				{/* Board area */}
-				<table className="mt-3 mr-2 ml-0">
+				<table className="mt-3 mr-2 ml-0 table-fixed">
 					<tbody>
 						{board}
 					</tbody>
@@ -363,20 +601,31 @@ const BoardConfigurationsAreEqual = (prevProps: IBoardParameters, nextProps: IBo
 		shouldBuildWalls: prevBuildWalls,
 		shouldVisualizePathAlgorithm: prevVisualizePath,
 		shouldResetPath: prevResetPath,
-		shouldResetBoard: prevResetBoard
+		shouldResetBoard: prevResetBoard,
+		paintMode: prevPaintMode
 	} = prevProps;
 
 	const {
 		shouldBuildWalls: nextBuildWalls,
 		shouldVisualizePathAlgorithm: nextVisualizePath,
 		shouldResetPath: nextResetPath,
-		shouldResetBoard: nextResetBoard
+		shouldResetBoard: nextResetBoard,
+		paintMode: nextPaintMode
 	} = nextProps;
 
+	// pathAlgorithm/wallAlgorithm/stepDelay are only ever read at the moment
+	// one of the boolean signal flags above flips (Build Walls/Visualize
+	// clicked) - by then Board will already be re-rendering for that reason,
+	// picking up whatever the parent's latest value is, so they don't need
+	// to be compared here. paintMode is different: it's read on every ad hoc
+	// cell click/drag, with no flag-flip to force a re-render around it, so
+	// skipping it here would let a stale closure paint with the wrong mode
+	// after the user switches it.
 	return prevBuildWalls === nextBuildWalls &&
 	prevVisualizePath === nextVisualizePath &&
 	prevResetPath === nextResetPath &&
-	prevResetBoard === nextResetBoard
+	prevResetBoard === nextResetBoard &&
+	prevPaintMode === nextPaintMode
 }
 
 const BoardMemo = React.memo(Board, BoardConfigurationsAreEqual);

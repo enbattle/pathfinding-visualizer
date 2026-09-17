@@ -9,6 +9,8 @@
   --goal-path-intermediate-color: orange;
   --goal-path-final-color: yellow;
   --wall-color: #483c32;
+  --weight-color: #b8860b;
+  --anchor-color: gold;
   --text-color: white;
   --light-box-shadow-color: #00d2ff;
   --dark-box-shadow-color: #3a47d5;
@@ -90,16 +92,36 @@ code {
   }
 }
 
-/* Board/maze styles */
+/*
+ * Board/maze styles. Fixed width/height (border-box, so border+padding sit
+ * inside them) keep every cell identically sized regardless of content -
+ * without this, a <td> containing text (the "S"/"G" anchor glyphs) sizes
+ * itself, and its whole table row/column, from that content instead of
+ * matching its empty siblings. Pair with table-fixed on the <table> so
+ * column widths can't grow from content either.
+ */
 @utility board-cell {
+  box-sizing: border-box;
+  width: 1.75rem;
+  height: 1.75rem;
   border: 2px solid black;
-  padding: 0.75rem;
+  padding: 0.25rem;
   border-radius: 0.5rem;
+  vertical-align: middle;
 }
 
-/* Start and goal cells share identical styling */
+/*
+ * Start and goal cells share identical styling. font-size/line-height are
+ * set explicitly (rather than left at the body default) because the "S"/"G"
+ * glyph is the only board-cell content with actual text - left unconstrained,
+ * its default line-height exceeds board-cell's fixed content box and grows
+ * that table row taller than every sibling row, even with box-sizing:
+ * border-box on the cell itself.
+ */
 @utility board-cell-anchor {
   font-weight: bold;
+  font-size: 0.75rem;
+  line-height: 1;
   border-radius: 0.75rem;
   box-shadow:
     0.5rem 0.5rem 1rem 0 goldenrod inset,
@@ -260,4 +282,44 @@ code {
 
 .wall-fill {
   animation-name: wallfill;
+}
+
+/*
+ * Weighted-terrain cells (higher traversal cost for Dijkstra, A-star, and
+ * Greedy Best-first) - distinct from both the wall color and every
+ * search-animation color so a cell's state is always unambiguous at a
+ * glance.
+ */
+@utility weight-fill {
+  background-color: var(--weight-color);
+}
+
+/* Legend swatches (src/components/configurations.tsx) - small static color
+   keys, independent of the animated board-cell classes above. */
+@utility legend-swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+@utility legend-swatch-anchor {
+  background-color: var(--anchor-color);
+}
+
+@utility legend-swatch-wall {
+  background-color: var(--wall-color);
+}
+
+@utility legend-swatch-weight {
+  background-color: var(--weight-color);
+}
+
+@utility legend-swatch-visited {
+  background-color: var(--board-fill-final-color);
+}
+
+@utility legend-swatch-path {
+  background-color: var(--goal-path-final-color);
 }

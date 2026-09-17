@@ -180,7 +180,8 @@ function showGoalPathLine(
   path: SearchNode,
   fillDelay: number,
   scheduleTimeout: ScheduleTimeout,
-  callbacks: AnimationCallbacks
+  callbacks: AnimationCallbacks,
+  stepDelay: number
 ): void {
   let timeDelay = fillDelay;
 
@@ -229,7 +230,7 @@ function showGoalPathLine(
               }
             }
           },
-          timeDelay + ((path[1].length) * 10)
+          timeDelay + ((path[1].length) * stepDelay)
         );
       }
       else if(path[1][i].direction === "down") { // Down direction paths
@@ -246,7 +247,7 @@ function showGoalPathLine(
               }
             }
           },
-          timeDelay + ((path[1].length) * 10)
+          timeDelay + ((path[1].length) * stepDelay)
         );
       }
       else if(path[1][i].direction === "left") { // Left direction paths
@@ -263,7 +264,7 @@ function showGoalPathLine(
               }
             }
           },
-          timeDelay + ((path[1].length) * 10)
+          timeDelay + ((path[1].length) * stepDelay)
         );
       }
       else if(path[1][i].direction === "right") { // Right direction paths
@@ -280,13 +281,13 @@ function showGoalPathLine(
               }
             }
           },
-          timeDelay + ((path[1].length) * 10)
+          timeDelay + ((path[1].length) * stepDelay)
         );
       }
       else {
         continue;
       }
-      timeDelay += 10;
+      timeDelay += stepDelay;
     }
   }
 }
@@ -314,6 +315,7 @@ type PriorityFn = (child: CoordinateAndDirection, parentPriority: number, goal: 
  * @param callbacks - reports each visual change so the caller can drive board state
  * @param frontier - the frontier data structure driving exploration order
  * @param computePriority - priority function for a weighted frontier (omitted for BFS/DFS)
+ * @param stepDelay - ms added to fillDelay per animated step (speed control)
  * @returns path from start coordinate to goal coordinate, or null if none exists
  */
 function search(
@@ -325,12 +327,13 @@ function search(
   scheduleTimeout: ScheduleTimeout,
   callbacks: AnimationCallbacks,
   frontier: UnweightedFrontier | PriorityQueueAscend<SearchNode>,
-  computePriority?: PriorityFn
+  computePriority?: PriorityFn,
+  stepDelay: number = 10
 ): CoordinateAndDirection[] | null {
 
   const path: CoordinateAndDirection[] = [];
   const visited = new Set<string>();
-  let fillDelay = 10;
+  let fillDelay = stepDelay;
 
   // if start state is the goal state
   if(checkStartIsGoal(start, goal)) {
@@ -361,7 +364,7 @@ function search(
         parent[1].push(goal);
 
         // Fill the goal path at the end
-        showGoalPathLine(columns, parent, fillDelay, scheduleTimeout, callbacks);
+        showGoalPathLine(columns, parent, fillDelay, scheduleTimeout, callbacks, stepDelay);
         return parent[1];
       }
       else {
@@ -393,7 +396,7 @@ function search(
                 },
                 fillDelay
               );
-              fillDelay += 10;
+              fillDelay += stepDelay;
             }
           }
 
@@ -418,6 +421,7 @@ function search(
  * @param algoType - string indicating the type of unweighted algorithm
  * @param scheduleTimeout - schedules a timed animation step (caller owns cancellation)
  * @param callbacks - reports each visual change so the caller can drive board state
+ * @param stepDelay - ms added to fillDelay per animated step (speed control)
  * @returns path from start coordinate to goal coordinate in an unweighted search
  */
 function unweightedSearch(
@@ -428,15 +432,25 @@ function unweightedSearch(
   walls: Set<string>,
   algoType: string,
   scheduleTimeout: ScheduleTimeout,
-  callbacks: AnimationCallbacks
+  callbacks: AnimationCallbacks,
+  stepDelay: number = 10
 ): CoordinateAndDirection[] | null {
   // Breadth-first pops in the order pushed (FIFO); depth-first always pops
   // whatever was pushed most recently (LIFO) - see Queue/Stack in models.ts.
+  // BFS/DFS are intentionally weight-blind (every step costs exactly 1,
+  // regardless of any weighted terrain) - that's what makes them visibly
+  // different from Dijkstra/A* on a weighted grid; only weightedSearch below
+  // reads terrain weight.
   const frontier: UnweightedFrontier = algoType === "BreadthFirstSearch"
     ? new Queue<SearchNode>()
     : new Stack<SearchNode>();
 
-  return search(rows, columns, start, goal, walls, scheduleTimeout, callbacks, frontier);
+  return search(rows, columns, start, goal, walls, scheduleTimeout, callbacks, frontier, undefined, stepDelay);
+}
+
+// Looks up a cell's traversal weight (defaults to 1, i.e. unweighted).
+function getWeight(weights: Map<string, number>, coordinate: CoordinateAndDirection): number {
+  return weights.get(coordinate.row + "_" + coordinate.column) ?? 1;
 }
 
 /**
@@ -446,9 +460,11 @@ function unweightedSearch(
  * @param start - start coordinate
  * @param goal - goal coordinate
  * @param walls - set containing all the walls of the board
+ * @param weights - map of coordinate key ("row_column") to traversal cost for weighted terrain (absent = 1)
  * @param algoType - string indicating the type of weighted algorithm
  * @param scheduleTimeout - schedules a timed animation step (caller owns cancellation)
  * @param callbacks - reports each visual change so the caller can drive board state
+ * @param stepDelay - ms added to fillDelay per animated step (speed control)
  * @returns path from start coordinate to goal coordinate in an weighted search
  */
 function weightedSearch(
@@ -457,30 +473,36 @@ function weightedSearch(
   start: CoordinateAndDirection,
   goal: CoordinateAndDirection,
   walls: Set<string>,
+  weights: Map<string, number>,
   algoType: string,
   scheduleTimeout: ScheduleTimeout,
-  callbacks: AnimationCallbacks
+  callbacks: AnimationCallbacks,
+  stepDelay: number = 10
 ): CoordinateAndDirection[] | null {
   let computePriority: PriorityFn;
 
   if(algoType === "GreedyBestFirstSearch") {
     // Greedy only ever looks at distance-to-goal - the path taken to get
-    // here doesn't factor in, so it's fast but not guaranteed shortest.
+    // here (and so terrain weight, which is a path-cost concept) never
+    // factors in. It's fast but not guaranteed shortest, and its chosen
+    // path is unaffected by weighted terrain - that's the point of
+    // contrasting it with Dijkstra/A* on the same weighted grid.
     computePriority = (child, _parentPriority, goal) => getEuclideanDistance(child, goal);
   }
   else if(algoType === "AStarAlgorithm") {
-    // f = g + h: cost-so-far plus a straight-line estimate of what's left.
-    // getEuclideanDistance must return true (not squared) distance here -
-    // it can never overestimate the real (Manhattan) grid distance, which
-    // is what keeps A* guaranteed to return a shortest path.
-    computePriority = (child, parentPriority, goal) => (parentPriority + 1) + getEuclideanDistance(child, goal);
+    // f = g + h: cost-so-far (now terrain-weighted) plus a straight-line
+    // estimate of what's left. getEuclideanDistance must return true (not
+    // squared) distance here - it can never overestimate the real
+    // (Manhattan) grid distance, which is what keeps A* guaranteed to
+    // return a shortest (lowest-cost) path even with weighted terrain.
+    computePriority = (child, parentPriority, goal) => (parentPriority + getWeight(weights, child)) + getEuclideanDistance(child, goal);
   }
   else {
-    // Dijkstra's Algorithm: pure cost-so-far, no heuristic.
-    computePriority = (_child, parentPriority) => parentPriority + 1;
+    // Dijkstra's Algorithm: pure cost-so-far (terrain-weighted), no heuristic.
+    computePriority = (child, parentPriority) => parentPriority + getWeight(weights, child);
   }
 
-  return search(rows, columns, start, goal, walls, scheduleTimeout, callbacks, new PriorityQueueAscend<SearchNode>(), computePriority);
+  return search(rows, columns, start, goal, walls, scheduleTimeout, callbacks, new PriorityQueueAscend<SearchNode>(), computePriority, stepDelay);
 }
 
 export {

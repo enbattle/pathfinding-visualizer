@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { vi } from 'vitest';
-import { recursiveDivision, recursiveDivisionTwoLayers } from './walls';
+import { recursiveDivision, recursiveDivisionTwoLayers, prims } from './walls';
 import { unweightedSearch } from './paths';
 import type { CoordinateAndDirection } from '../models/models';
 
@@ -77,6 +77,44 @@ describe('recursive division maze generation', () => {
       expect(path).not.toBeNull();
     }
   );
+
+  it.each(Array.from({ length: TRIALS }, (_, i) => i))(
+    "prims leaves start and goal reachable (trial %i)",
+    () => {
+      const walls = collectWalls((buildWall) =>
+        prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+      );
+
+      const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
+      const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+
+      expect(path).not.toBeNull();
+    }
+  );
+
+  it("prims never places a wall directly on the start or goal cell", () => {
+    const walls = collectWalls((buildWall) =>
+      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+    );
+
+    expect(walls.has(`${start.row}_${start.column}`)).toBe(false);
+    expect(walls.has(`${goal.row}_${goal.column}`)).toBe(false);
+  });
+
+  it("prims produces a structurally different wall count than recursive division (organic vs. blocky)", () => {
+    // Not a rigorous "shape" check, but a cheap structural sanity check
+    // that Prim's isn't secretly degenerating into the same partition
+    // pattern (or into an all-open / all-walled board).
+    vi.spyOn(Math, 'random').mockReturnValue(0.37);
+    const primsWalls = collectWalls((buildWall) =>
+      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+    );
+    vi.restoreAllMocks();
+
+    const interiorCells = (rows - 2) * (columns - 2);
+    expect(primsWalls.size).toBeGreaterThan(0);
+    expect(primsWalls.size).toBeLessThan(interiorCells);
+  });
 
   it('never places a wall directly on the start or goal cell', () => {
     // A single deterministic seed is fine here - this checks the

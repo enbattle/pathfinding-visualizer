@@ -14,7 +14,8 @@ function drawBorderWalls(
   goal: CoordinateAndDirection,
   maxRows: number,
   maxColumns: number,
-  buildWall: (rowCoordinate: number, columnCoordinate: number) => void
+  buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  stepDelay: number = 10
 ): void {
 
   let fillDelay = 0;
@@ -27,7 +28,7 @@ function drawBorderWalls(
         buildWall(i, 0),
         fillDelay
       );
-      fillDelay += 10;
+      fillDelay += stepDelay;
   }
 
   for(let i=0; i<maxColumns; i++) {
@@ -38,7 +39,7 @@ function drawBorderWalls(
         buildWall(maxRows-1, i),
         fillDelay
       );
-      fillDelay += 10;
+      fillDelay += stepDelay;
   }
 
   for(let i=maxRows-1; i>=0; i--) {
@@ -49,7 +50,7 @@ function drawBorderWalls(
       buildWall(i, maxColumns-1),
         fillDelay
       );
-      fillDelay += 10;
+      fillDelay += stepDelay;
   }
 
   for(let i=maxColumns-1; i>=0; i--) {
@@ -60,7 +61,7 @@ function drawBorderWalls(
         buildWall(0, i),
         fillDelay
       );
-      fillDelay += 10;
+      fillDelay += stepDelay;
   }
 }
 
@@ -93,6 +94,7 @@ function getHorizontalOrientation(horizontalWidth: number, verticalLength: numbe
  * @param maxY - current maximum y value (row)
  * @param maxX - current maximum x value (column)
  * @param buildWall - function to build a wall on the board
+ * @param stepDelay - ms added to fillDelay per animated wall placement (speed control)
  * @returns none
  */
 function buildDividingWalls(
@@ -106,7 +108,8 @@ function buildDividingWalls(
   x: number,
   maxY: number,
   maxX: number,
-  buildWall: (rowCoordinate: number, columnCoordinate: number) => void
+  buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  stepDelay: number = 10
 ): void {
 
   // A wall this thick needs this much room on either side of it before the
@@ -147,13 +150,13 @@ function buildDividingWalls(
             fillDelay
           );
         }
-        fillDelay += 10;
+        fillDelay += stepDelay;
       }
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, wallY-partitionOffset, maxX, buildWall);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, wallY+partitionOffset, x, maxY, maxX, buildWall);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, wallY-partitionOffset, maxX, buildWall, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, wallY+partitionOffset, x, maxY, maxX, buildWall, stepDelay);
   }
   else {
     // Wall should be on an even column
@@ -175,13 +178,13 @@ function buildDividingWalls(
             fillDelay
           );
         }
-        fillDelay += 10;
+        fillDelay += stepDelay;
       }
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, wallX-partitionOffset, buildWall);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, wallX+partitionOffset, maxY, maxX, buildWall);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, wallX-partitionOffset, buildWall, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, wallX+partitionOffset, maxY, maxX, buildWall, stepDelay);
   }
 }
 
@@ -198,9 +201,10 @@ function recursiveDivision(
   x: number,
   maxY: number,
   maxX: number,
-  buildWall: (rowCoordinate: number, columnCoordinate: number) => void
+  buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  stepDelay: number = 10
 ): void {
-  buildDividingWalls(1, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall);
+  buildDividingWalls(1, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, stepDelay);
 }
 
 /**
@@ -216,13 +220,147 @@ function recursiveDivisionTwoLayers(
   x: number,
   maxY: number,
   maxX: number,
-  buildWall: (rowCoordinate: number, columnCoordinate: number) => void
+  buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  stepDelay: number = 10
 ): void {
-  buildDividingWalls(2, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall);
+  buildDividingWalls(2, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, stepDelay);
+}
+
+/**
+ * Randomized Prim's algorithm - grows a random spanning tree over a
+ * "chamber" lattice (every 2nd cell in each dimension, relative to the
+ * interior's top-left corner) rather than carving every individual cell,
+ * so the result reads as a proper maze (walls remain between passages)
+ * instead of an all-open board - a structurally different, organic/
+ * branching look versus Recursive Division's blocky partitions.
+ *
+ * Connectivity is guaranteed by construction, not by chance: start and
+ * goal are each explicitly wired into the lattice via a short carved
+ * connector (needed since they won't generally land exactly on a chamber
+ * cell), and the chamber lattice itself is always fully connected - a
+ * spanning tree grown from one chamber always reaches every other chamber,
+ * since the underlying chamber grid is itself fully connected via
+ * cardinal adjacency. So start and goal are always mutually reachable
+ * through (their own connector) -> (the spanning tree) -> (the other's
+ * connector).
+ *
+ * @param fillDelay - delay used by setTimeouts to fill the board
+ * @param start - start coordinate
+ * @param goal - goal coordinate
+ * @param maxRows - total number of rows on the board (unused; kept for call-site parity with recursiveDivision/recursiveDivisionTwoLayers)
+ * @param maxColumns - total number of columns on the board (unused; see above)
+ * @param y - current minimum y value (row) of the interior region
+ * @param x - current minimum x value (column) of the interior region
+ * @param maxY - current maximum y value (row) of the interior region
+ * @param maxX - current maximum x value (column) of the interior region
+ * @param buildWall - function to build a wall on the board
+ * @param stepDelay - ms added to fillDelay per animated wall placement (speed control)
+ */
+function prims(
+  fillDelay: number,
+  start: CoordinateAndDirection,
+  goal: CoordinateAndDirection,
+  maxRows: number,
+  maxColumns: number,
+  y: number,
+  x: number,
+  maxY: number,
+  maxX: number,
+  buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  stepDelay: number = 10
+): void {
+  const key = (r: number, c: number) => r + "_" + c;
+
+  const carved = new Set<string>();
+
+  // Carves a short straight connector from an arbitrary interior cell to
+  // the nearest chamber cell (fixing row parity, then column parity, one
+  // step at a time) so start/goal always end up wired into the lattice
+  // even when they don't land on a chamber cell themselves.
+  const connectToLattice = (row: number, column: number): void => {
+    let r = row;
+    let c = column;
+    carved.add(key(r, c));
+
+    if ((r - y) % 2 !== 0) {
+      r = r + 1 <= maxY ? r + 1 : r - 1;
+      carved.add(key(r, c));
+    }
+    if ((c - x) % 2 !== 0) {
+      c = c + 1 <= maxX ? c + 1 : c - 1;
+      carved.add(key(r, c));
+    }
+  };
+
+  connectToLattice(start.row, start.column);
+  connectToLattice(goal.row, goal.column);
+
+  const chamberRows: number[] = [];
+  for (let r = y; r <= maxY; r += 2) chamberRows.push(r);
+  const chamberColumns: number[] = [];
+  for (let c = x; c <= maxX; c += 2) chamberColumns.push(c);
+
+  if (chamberRows.length > 0 && chamberColumns.length > 0) {
+    const visited = new Set<string>();
+    // Each frontier entry is a not-yet-visited chamber, and the
+    // already-visited chamber it would be carved in from.
+    const frontier: { row: number; column: number; fromRow: number; fromColumn: number }[] = [];
+
+    const addFrontier = (row: number, column: number): void => {
+      const neighbors: [number, number][] = [
+        [row - 2, column],
+        [row + 2, column],
+        [row, column - 2],
+        [row, column + 2]
+      ];
+      for (const [nr, nc] of neighbors) {
+        if (nr >= y && nr <= maxY && nc >= x && nc <= maxX && !visited.has(key(nr, nc))) {
+          frontier.push({ row: nr, column: nc, fromRow: row, fromColumn: column });
+        }
+      }
+    };
+
+    const startChamberRow = chamberRows[Math.floor(Math.random() * chamberRows.length)];
+    const startChamberColumn = chamberColumns[Math.floor(Math.random() * chamberColumns.length)];
+
+    visited.add(key(startChamberRow, startChamberColumn));
+    carved.add(key(startChamberRow, startChamberColumn));
+    addFrontier(startChamberRow, startChamberColumn);
+
+    while (frontier.length > 0) {
+      const index = Math.floor(Math.random() * frontier.length);
+      const { row, column, fromRow, fromColumn } = frontier[index];
+      frontier.splice(index, 1);
+
+      if (visited.has(key(row, column))) continue;
+
+      visited.add(key(row, column));
+      carved.add(key(row, column));
+      // The connector cell sits exactly between the chamber being carved
+      // in and the already-visited chamber it's being carved in from.
+      carved.add(key((row + fromRow) / 2, (column + fromColumn) / 2));
+
+      addFrontier(row, column);
+    }
+  }
+
+  // Every interior cell that never got carved open is a wall.
+  let delay = fillDelay;
+  for (let r = y; r <= maxY; r++) {
+    for (let c = x; c <= maxX; c++) {
+      const isStart = start.row === r && start.column === c;
+      const isGoal = goal.row === r && goal.column === c;
+      if (!carved.has(key(r, c)) && !isStart && !isGoal) {
+        setTimeout(() => buildWall(r, c), delay);
+        delay += stepDelay;
+      }
+    }
+  }
 }
 
 export {
   recursiveDivision,
   recursiveDivisionTwoLayers,
+  prims,
   drawBorderWalls
 }
