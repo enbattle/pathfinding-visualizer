@@ -130,6 +130,17 @@ function buildDividingWalls(
   const inSafetyBuffer = (position: number, wallStart: number) =>
     Math.abs(position - wallStart) <= wallThickness;
 
+  // True when start/goal's own row (or column, for vertical walls) falls
+  // *inside* the wall's thickness-span rather than merely being adjacent to
+  // it - i.e. the wall would otherwise run directly through the cell
+  // start/goal sits on. A single-cell opening at its own column (row) isn't
+  // enough in that case: the cells immediately beside it *in that same wall
+  // line* are still walled, which seals off its only remaining access
+  // along the line. Widening the exclusion to those neighbors too is what
+  // guarantees start/goal always keeps at least one open side.
+  const isEmbeddedInWall = (position: number, wallStart: number) =>
+    position >= wallStart && position < wallStart + wallThickness;
+
   if(horizontalOrientation) {
     // Wall should be on an even row
     const wallY = evenRandIntBetween(y, maxY);
@@ -140,8 +151,10 @@ function buildDividingWalls(
     // Fill walls
     for(let i=x; i<=maxX; i++) {
       const isOpening = openingX === i;
-      const wouldTrapStart = start.column === i && inSafetyBuffer(start.row, wallY);
-      const wouldTrapGoal = goal.column === i && inSafetyBuffer(goal.row, wallY);
+      const wouldTrapStart = inSafetyBuffer(start.row, wallY) &&
+        (isEmbeddedInWall(start.row, wallY) ? Math.abs(i - start.column) <= 1 : i === start.column);
+      const wouldTrapGoal = inSafetyBuffer(goal.row, wallY) &&
+        (isEmbeddedInWall(goal.row, wallY) ? Math.abs(i - goal.column) <= 1 : i === goal.column);
 
       if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
         for(let layer=0; layer<wallThickness; layer++) {
@@ -168,8 +181,10 @@ function buildDividingWalls(
     // Fill walls
     for(let i=y; i<=maxY; i++) {
       const isOpening = openingY === i;
-      const wouldTrapStart = start.row === i && inSafetyBuffer(start.column, wallX);
-      const wouldTrapGoal = goal.row === i && inSafetyBuffer(goal.column, wallX);
+      const wouldTrapStart = inSafetyBuffer(start.column, wallX) &&
+        (isEmbeddedInWall(start.column, wallX) ? Math.abs(i - start.row) <= 1 : i === start.row);
+      const wouldTrapGoal = inSafetyBuffer(goal.column, wallX) &&
+        (isEmbeddedInWall(goal.column, wallX) ? Math.abs(i - goal.row) <= 1 : i === goal.row);
 
       if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
         for(let layer=0; layer<wallThickness; layer++) {

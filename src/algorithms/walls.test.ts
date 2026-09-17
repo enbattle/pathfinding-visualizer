@@ -8,6 +8,10 @@ function coord(row: number, column: number): CoordinateAndDirection {
   return { row, column, direction: '' };
 }
 
+function randIntBetween(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 // unweightedSearch's returned path is computed synchronously; the animation
 // harness just needs to satisfy the signature.
 function createAnimationHarness() {
@@ -129,4 +133,46 @@ describe('recursive division maze generation', () => {
     expect(walls.has(`${start.row}_${start.column}`)).toBe(false);
     expect(walls.has(`${goal.row}_${goal.column}`)).toBe(false);
   });
+});
+
+describe('recursive division maze generation - start/goal placed anywhere (e.g. after dragging)', () => {
+  // Regression coverage for a bug where a wall row/column landing exactly
+  // on start or goal's own row/column (not just adjacent to it) would wall
+  // off its immediate left/right (or up/down) neighbors too, boxing it in
+  // completely. The fixed-position start/goal used by the suite above
+  // never happened to exercise that exact-row/column case, so this drags
+  // start/goal to arbitrary interior cells across several board shapes
+  // instead of the app's default placement.
+  const ALGORITHMS: [string, typeof recursiveDivision][] = [
+    ['recursiveDivision', recursiveDivision],
+    ['recursiveDivisionTwoLayers', recursiveDivisionTwoLayers],
+  ];
+
+  const SIZES: [number, number][] = [[21, 21], [30, 45], [45, 30]];
+
+  const TRIALS = 25;
+
+  for (const [name, algorithm] of ALGORITHMS) {
+    for (const [rows, columns] of SIZES) {
+      it.each(Array.from({ length: TRIALS }, (_, i) => i))(
+        `${name} on a ${rows}x${columns} board leaves a randomly-placed start/goal reachable (trial %i)`,
+        () => {
+          const start = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
+          let goal = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
+          while (goal.row === start.row && goal.column === start.column) {
+            goal = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
+          }
+
+          const walls = collectWalls((buildWall) =>
+            algorithm(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+          );
+
+          const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
+          const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+
+          expect(path).not.toBeNull();
+        }
+      );
+    }
+  }
 });

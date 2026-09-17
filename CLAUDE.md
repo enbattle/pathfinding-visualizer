@@ -20,9 +20,19 @@ GitHub Pages via `.github/workflows/deploy.yml`.
   6th algorithm or changing how any existing one explores.
 - `src/algorithms/walls.tsx` - both Recursive Division variants reduce to
   one shared `buildDividingWalls()`, parameterized by wall thickness (1 or
-  2 cells). It always leaves exactly one opening per wall, which is what
-  guarantees every generated maze stays fully connected - keep that
-  invariant if you touch the exclusion-zone logic.
+  2 cells). Each wall normally leaves exactly one opening, which is what
+  keeps every generated maze fully connected. The one exception is
+  deliberate: if start/goal's own row (or column, for vertical walls)
+  falls inside the wall's own thickness-span rather than merely being
+  adjacent to it, a single-cell exclusion at its own column isn't enough -
+  the cells beside it *in that same wall line* would still be walled,
+  sealing off its only remaining access. `isEmbeddedInWall` detects this
+  and widens the exclusion to its immediate neighbors too, so start/goal
+  is never fully boxed in even when dragged onto a coordinate a wall would
+  otherwise run straight through. Regression coverage for this lives in
+  `walls.test.ts`'s "placed anywhere (e.g. after dragging)" suite - keep
+  both that test and the widened-exclusion behavior if you touch the
+  exclusion-zone logic.
 - `src/models/models.ts` - the typed data structures the algorithms run
   on: `Stack`/`Queue`/`PriorityQueueAscend` (a real binary heap, not a
   sort-per-push array - keep it that way, it's the difference between
