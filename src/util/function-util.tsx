@@ -66,13 +66,18 @@ function getManhattanDistance(current: CoordinateAndDirection, end: CoordinateAn
 }
 
 /**
- * 
+ *
  * @param {*} current - current CoordinateAndDirection (has a row and column property to define position)
  * @param {*} end  = goal CoordinateAndDirection (has a row and column property to define position)
- * @returns Euclidean distance between the coordinates 
+ * @returns Euclidean distance between the coordinates
  */
 function getEuclideanDistance(current: CoordinateAndDirection, end: CoordinateAndDirection) {
-  return Math.pow(current.column - end.column, 2) + Math.pow(current.row - end.row, 2);
+  // Must be true distance, not squared - A* sums this directly with a linear
+  // step cost (f = g + h), and an admissible heuristic can never overestimate
+  // the true remaining cost. Squared distance overestimates badly (e.g. a
+  // 3-4-5 offset: true distance 5, squared 25), which breaks A*'s shortest-
+  // path guarantee.
+  return Math.sqrt(Math.pow(current.column - end.column, 2) + Math.pow(current.row - end.row, 2));
 }
 
 export {
