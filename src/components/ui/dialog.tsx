@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 import { AiOutlineClose } from 'react-icons/ai';
 import { cn } from '@/lib/utils';
 
