@@ -1,7 +1,7 @@
 import { PATH_ALGORITHMS, type PathAlgorithmId } from '../engine';
 import type { RunPhase } from '../visualizer/runs';
 
-export interface PseudocodeLine {
+interface PseudocodeLine {
   readonly text: string;
   /** Indentation depth. */
   readonly depth: number;

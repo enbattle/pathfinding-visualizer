@@ -23,7 +23,7 @@ import {
 export const MAX_RACERS = 4;
 
 /** How long a cell's entrance animation lasts, in seconds of playback. */
-export const ENTRANCE_SECONDS = 0.35;
+const ENTRANCE_SECONDS = 0.35;
 
 export const NO_PATH_MESSAGE = 'No path was found. Please try again.';
 

@@ -9,12 +9,12 @@ import {
 // so decodeShare() validates everything, bounds the work it does before
 // validating, and never throws.
 
-export const SHARE_VERSION = 1;
-export const MAX_SHARED_CELLS = 20_000;
+const SHARE_VERSION = 1;
+const MAX_SHARED_CELLS = 20_000;
 // Smaller boards have no interior for a maze, and on 3-4 rows the app's
 // random start/goal placement (board-setup.ts) could pick the same cell.
-export const MIN_SHARED_DIMENSION = 5;
-export const MAX_SHARED_DIMENSION = 200;
+const MIN_SHARED_DIMENSION = 5;
+const MAX_SHARED_DIMENSION = 200;
 /** Longer input is rejected before any decoding. */
 export const MAX_FRAGMENT_LENGTH = 12_000;
 

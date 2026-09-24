@@ -21,7 +21,7 @@ export interface GridProblem {
 }
 
 // The weighted-terrain cost the app paints (WEIGHTED_TERRAIN_COST).
-export const WEIGHTED_COST = WEIGHTED_TERRAIN_COST;
+const WEIGHTED_COST = WEIGHTED_TERRAIN_COST;
 
 export interface GridProblemOptions {
   maxSize?: number;
@@ -68,7 +68,7 @@ export function gridProblemArbitrary({
     });
 }
 
-export function neighborsOf(problem: GridProblem, index: number): number[] {
+function neighborsOf(problem: GridProblem, index: number): number[] {
   const { rows, columns } = problem;
   const row = Math.floor(index / columns);
   const column = index % columns;

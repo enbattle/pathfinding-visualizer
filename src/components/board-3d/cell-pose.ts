@@ -6,7 +6,7 @@ import { mixColor, type BoardPalette, type CellLayer } from '../board-renderer';
 // differs. Pure (no three.js), so it's unit-testable without WebGL.
 
 /** Steps in the visited color ramp (matches the 2D renderer). */
-export const RAMP_STEPS = 24;
+const RAMP_STEPS = 24;
 
 /** Heights in cell widths. */
 export const HEIGHTS = {

@@ -11,7 +11,7 @@ export interface FrameClock {
 }
 
 /** Uses window.requestAnimationFrame / cancelAnimationFrame. */
-export const animationFrameClock: FrameClock = {
+const animationFrameClock: FrameClock = {
   request: callback => window.requestAnimationFrame(callback),
   cancel: handle => window.cancelAnimationFrame(handle),
 };
