@@ -1,5 +1,11 @@
 import React from 'react';
 import BoardMemo, { type RunStats } from './board';
+import {
+  MAZE_ALGORITHMS,
+  PATH_ALGORITHMS,
+  type MazeAlgorithmId,
+  type PathAlgorithmId,
+} from '../engine';
 import type { CoordinateAndDirection } from '../models/models';
 import {
   computeBoardSize,
@@ -96,9 +102,9 @@ const Configuration = () => {
 
   // Initialize board states
   const [pathAlgorithm, setPathAlgorithm] =
-    React.useState<string>('BreadthFirstSearch');
+    React.useState<PathAlgorithmId>('bfs');
   const [wallAlgorithm, setWallAlgorithm] =
-    React.useState<string>('RecursiveDivision');
+    React.useState<MazeAlgorithmId>('recursive-division');
   const [paintMode, setPaintMode] = React.useState<'wall' | 'weight'>('wall');
   const [speed, setSpeed] = React.useState<number>(DEFAULT_SPEED);
   const [shouldBuildWalls, setShouldBuildWalls] =
@@ -214,7 +220,13 @@ const Configuration = () => {
 					    action, so nothing else shares its row. */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="wallAlgorithmChoices">Wall Algorithm</Label>
-            <Select value={wallAlgorithm} onValueChange={setWallAlgorithm}>
+            <Select
+              value={wallAlgorithm}
+              // Radix only ever reports one of the SelectItem values below.
+              onValueChange={value =>
+                setWallAlgorithm(value as MazeAlgorithmId)
+              }
+            >
               <SelectTrigger
                 id="wallAlgorithmChoices"
                 aria-label="Wall Algorithm Choices"
@@ -222,13 +234,11 @@ const Configuration = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="RecursiveDivision">
-                  Recursive Division
-                </SelectItem>
-                <SelectItem value="RecursiveDivisionTwoLayers">
-                  Twin Recursive Division
-                </SelectItem>
-                <SelectItem value="Prims">Prim's Algorithm</SelectItem>
+                {MAZE_ALGORITHMS.map(({ id, label }) => (
+                  <SelectItem key={id} value={id}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button
@@ -295,7 +305,12 @@ const Configuration = () => {
           {/* Path Algorithm type */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="pathAlgorithmChoices">Path Algorithm</Label>
-            <Select value={pathAlgorithm} onValueChange={setPathAlgorithm}>
+            <Select
+              value={pathAlgorithm}
+              onValueChange={value =>
+                setPathAlgorithm(value as PathAlgorithmId)
+              }
+            >
               <SelectTrigger
                 id="pathAlgorithmChoices"
                 aria-label="Path Algorithm Choices"
@@ -303,19 +318,11 @@ const Configuration = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="BreadthFirstSearch">
-                  Breadth-first Search
-                </SelectItem>
-                <SelectItem value="DepthFirstSearch">
-                  Depth-first Search
-                </SelectItem>
-                <SelectItem value="GreedyBestFirstSearch">
-                  Greedy Best-First Search
-                </SelectItem>
-                <SelectItem value="DijkstrasAlgorithm">
-                  Dijkstra's Algorithm
-                </SelectItem>
-                <SelectItem value="AStarAlgorithm">A* Algorithm</SelectItem>
+                {PATH_ALGORITHMS.map(({ id, label }) => (
+                  <SelectItem key={id} value={id}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button

@@ -1,12 +1,15 @@
 import React from 'react';
-import { weightedSearch, unweightedSearch } from '../algorithms/paths';
 import {
-  drawBorderWalls,
-  recursiveDivision,
-  recursiveDivisionTwoLayers,
-  prims,
-} from '../algorithms/walls';
+  createGrid,
+  generateMaze,
+  runSearch,
+  toIndex,
+  type Grid,
+  type MazeAlgorithmId,
+  type PathAlgorithmId,
+} from '../engine';
 import type { CoordinateAndDirection } from '../models/models';
+import { pathSegmentClasses } from './path-segments';
 import { cn } from '@/lib/utils';
 
 export interface RunStats {
@@ -20,8 +23,8 @@ interface IBoardParameters {
   columns: number;
   startCoordinate: CoordinateAndDirection;
   goalCoordinate: CoordinateAndDirection;
-  pathAlgorithm: string;
-  wallAlgorithm: string;
+  pathAlgorithm: PathAlgorithmId;
+  wallAlgorithm: MazeAlgorithmId;
   paintMode: 'wall' | 'weight';
   stepDelay: number;
   shouldBuildWalls: boolean;
@@ -47,7 +50,7 @@ const WEIGHT_VALUE = 5;
 // pathDirectionClass are independent overlays the search animation adds
 // on top - a cell that was visited during search AND ends up on the final
 // path carries all three at once, mirroring the original's additive
-// className behavior (see paths.tsx's AnimationCallbacks).
+// className behavior.
 interface CellState {
   kind: CellKind;
   visited: boolean;
@@ -174,10 +177,8 @@ const Board = ({
     buildInitialCells(rows, columns, startCoordinate, goalCoordinate)
   );
 
-  // Schedules a timed animation step for the wall and search algorithms
-  // (src/algorithms/walls.tsx, src/algorithms/paths.tsx) and tracks the timeout so it can be
-  // cancelled on reset. paths.tsx owns the delay math; this just owns
-  // bookkeeping/cancellation.
+  // Schedules a timed animation step (a wall placement, a discovered cell,
+  // a path segment) and tracks the timeout so it can be cancelled on reset.
   const scheduleTimeout = React.useCallback(
     (callback: () => void, delay: number): void => {
       const id = setTimeout(() => {
@@ -257,15 +258,6 @@ const Board = ({
     []
   );
 
-  const animationCallbacks = React.useMemo(
-    () => ({
-      onCellVisited: handleCellVisited,
-      onGoalPathFill: handleGoalPathFill,
-      onPathDirection: handlePathDirection,
-    }),
-    [handleCellVisited, handleGoalPathFill, handlePathDirection]
-  );
-
   // Sets a single cell's paint state (empty/wall/weight), keeping the
   // walls/weights refs and visual `kind` in sync and mutually exclusive.
   const setPaintKind = React.useCallback(
@@ -322,187 +314,117 @@ const Board = ({
     }
   };
 
-  // Draw border walls and add inner walls recursively
+  // Snapshot of the board as the engine's typed-array grid. walls/weights
+  // stay string-keyed here for now (they're UI state the paint/drag code
+  // mutates); the board component itself is replaced in the next phase.
+  const snapshotGrid = (): Grid => {
+    const grid = createGrid(rows, columns);
+    walls.current.forEach(key => {
+      const [row, column] = key.split('_').map(Number);
+      grid.walls[toIndex(grid, row, column)] = 1;
+    });
+    weights.current.forEach((weight, key) => {
+      const [row, column] = key.split('_').map(Number);
+      grid.weights[toIndex(grid, row, column)] = weight;
+    });
+    return grid;
+  };
+
+  const indexOf = (coordinate: CoordinateAndDirection): number =>
+    coordinate.row * columns + coordinate.column;
+
+  // Generate the maze up front, then animate each wall placement on its tick.
   const addRecursiveWalls = (): void => {
-    if (wallAlgorithm === 'RecursiveDivision') {
-      drawBorderWalls(
-        currentStart,
-        currentGoal,
+    const placements = generateMaze(
+      {
         rows,
         columns,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
-      recursiveDivision(
-        0,
-        currentStart,
-        currentGoal,
-        rows,
-        columns,
-        1,
-        1,
-        rows - 2,
-        columns - 2,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
-    } else if (wallAlgorithm === 'RecursiveDivisionTwoLayers') {
-      drawBorderWalls(
-        currentStart,
-        currentGoal,
-        rows,
-        columns,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
-      recursiveDivisionTwoLayers(
-        0,
-        currentStart,
-        currentGoal,
-        rows,
-        columns,
-        1,
-        1,
-        rows - 2,
-        columns - 2,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
-    } else if (wallAlgorithm === 'Prims') {
-      drawBorderWalls(
-        currentStart,
-        currentGoal,
-        rows,
-        columns,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
-      prims(
-        0,
-        currentStart,
-        currentGoal,
-        rows,
-        columns,
-        1,
-        1,
-        rows - 2,
-        columns - 2,
-        buildWall,
-        scheduleTimeout,
-        stepDelay
-      );
+        start: indexOf(currentStart),
+        goal: indexOf(currentGoal),
+      },
+      wallAlgorithm
+    );
+    for (const { index, tick } of placements) {
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      scheduleTimeout(() => buildWall(row, column), tick * stepDelay);
     }
   };
 
-  // Run the path finding algorithm
-  // if algorithm has already been run, you can't run the algorithm again
+  // Run the path finding algorithm to completion (timed on its own, without
+  // any animation work), then animate what it did: each newly discovered
+  // cell one step apart, then the path filling in, then the path's line
+  // segments. If the algorithm has already been run, it can't run again
+  // until the path is reset.
   const runVisualizeAlgorithm = (): void => {
-    let path = null;
-    if (shouldVisualizePathAlgorithm) {
-      onError(null);
-      countedVisitedRef.current = new Set();
-      statsRef.current = {
-        visitedCount: 0,
-        pathLength: null,
-        algorithmTimeMs: -1,
-      };
-      onStats(statsRef.current);
+    if (!shouldVisualizePathAlgorithm) return;
 
-      const startTime = performance.now();
-      if (pathAlgorithm === 'BreadthFirstSearch') {
-        path = unweightedSearch(
-          rows,
-          columns,
-          currentStart,
-          currentGoal,
-          walls.current,
-          'BreadthFirstSearch',
-          scheduleTimeout,
-          animationCallbacks,
-          stepDelay
-        );
-      } else if (pathAlgorithm === 'DepthFirstSearch') {
-        path = unweightedSearch(
-          rows,
-          columns,
-          currentStart,
-          currentGoal,
-          walls.current,
-          'DepthFirstSearch',
-          scheduleTimeout,
-          animationCallbacks,
-          stepDelay
-        );
-      } else if (pathAlgorithm === 'GreedyBestFirstSearch') {
-        path = weightedSearch(
-          rows,
-          columns,
-          currentStart,
-          currentGoal,
-          walls.current,
-          weights.current,
-          'GreedyBestFirstSearch',
-          scheduleTimeout,
-          animationCallbacks,
-          stepDelay
-        );
-      } else if (pathAlgorithm === 'DijkstrasAlgorithm') {
-        path = weightedSearch(
-          rows,
-          columns,
-          currentStart,
-          currentGoal,
-          walls.current,
-          weights.current,
-          'DijkstrasAlgorithm',
-          scheduleTimeout,
-          animationCallbacks,
-          stepDelay
-        );
-      } else if (pathAlgorithm === 'AStarAlgorithm') {
-        path = weightedSearch(
-          rows,
-          columns,
-          currentStart,
-          currentGoal,
-          walls.current,
-          weights.current,
-          'AStarAlgorithm',
-          scheduleTimeout,
-          animationCallbacks,
-          stepDelay
-        );
-      }
-      const algorithmTimeMs = performance.now() - startTime;
+    onError(null);
+    countedVisitedRef.current = new Set();
+    statsRef.current = {
+      visitedCount: 0,
+      pathLength: null,
+      algorithmTimeMs: -1,
+    };
+    onStats(statsRef.current);
 
-      if (path === null) {
-        onError('No path was found. Please try again.');
-        statsRef.current = {
-          ...statsRef.current,
-          pathLength: null,
-          algorithmTimeMs,
-        };
-      } else if (path.length === 0) {
-        onError('The start is the goal. Please try again.');
-        statsRef.current = {
-          ...statsRef.current,
-          pathLength: 0,
-          algorithmTimeMs,
-        };
-      } else {
-        statsRef.current = {
-          ...statsRef.current,
-          pathLength: path.length,
-          algorithmTimeMs,
-        };
-      }
-      onStats(statsRef.current);
+    const startTime = performance.now();
+    const { events, result } = runSearch(
+      {
+        grid: snapshotGrid(),
+        start: indexOf(currentStart),
+        goal: indexOf(currentGoal),
+      },
+      pathAlgorithm
+    );
+    const algorithmTimeMs = performance.now() - startTime;
+
+    let delay = stepDelay;
+    for (const event of events) {
+      if (event.type !== 'discover') continue;
+      const row = Math.floor(event.index / columns);
+      const column = event.index % columns;
+      scheduleTimeout(() => handleCellVisited(row, column), delay);
+      delay += stepDelay;
     }
+
+    const { path } = result;
+    if (path === null) {
+      onError('No path was found. Please try again.');
+      statsRef.current = {
+        ...statsRef.current,
+        pathLength: null,
+        algorithmTimeMs,
+      };
+    } else if (path.length === 1) {
+      onError('The start is the goal. Please try again.');
+      statsRef.current = {
+        ...statsRef.current,
+        pathLength: 0,
+        algorithmTimeMs,
+      };
+    } else {
+      const segments = pathSegmentClasses(path, columns);
+      // Segments are drawn once the whole path has filled in.
+      const segmentOffset = path.length * stepDelay;
+      segments.forEach((segment, i) => {
+        const index = path[i + 1];
+        const row = Math.floor(index / columns);
+        const column = index % columns;
+        scheduleTimeout(() => handleGoalPathFill(row, column), delay);
+        scheduleTimeout(
+          () => handlePathDirection(row, column, segment),
+          delay + segmentOffset
+        );
+        delay += stepDelay;
+      });
+      statsRef.current = {
+        ...statsRef.current,
+        pathLength: path.length,
+        algorithmTimeMs,
+      };
+    }
+    onStats(statsRef.current);
   };
 
   // --- Click/tap-and-drag paint + drag-to-move start/goal -----------------
