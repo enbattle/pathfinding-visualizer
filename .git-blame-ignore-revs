@@ -2,4 +2,4 @@
 # automatically; locally: git config blame.ignoreRevsFile .git-blame-ignore-revs).
 
 # Apply Prettier to the whole codebase
-ace705656230cd01e36029e3cf6c7861180731e0
+bc8e80f74479ea60cedb43d673fa030e9003a778
