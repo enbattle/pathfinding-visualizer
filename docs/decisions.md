@@ -118,3 +118,26 @@ border walls would otherwise seal it in. Found by an independent audit;
 interior mazes are unchanged.
 
 **Revisit if:** markers are ever restricted to interior cells instead.
+
+## 11. GitHub Actions is the only deploy path
+
+**Decision:** `.github/workflows/deploy.yml` deploys to GitHub Pages only
+after CI succeeds for a push to `main`, and deploys exactly the commit CI
+tested. The `gh-pages` package and the local deploy scripts were removed.
+
+**Why:** the manual local fallback was unused, and a second path could
+publish a build CI never checked. Now nothing CI rejected can ship.
+
+**Revisit if:** the site moves off GitHub Pages, or a release ever has to
+bypass CI.
+
+## 12. Icons come from lucide-react
+
+**Decision:** every icon is from `lucide-react`; `react-icons` is not a
+dependency.
+
+**Why:** `react-icons` was in use across five different icon packs, which
+mixed visual styles. Lucide is shadcn's default icon set, and
+`components.json` points at it.
+
+**Revisit if:** a needed icon doesn't exist in Lucide.
