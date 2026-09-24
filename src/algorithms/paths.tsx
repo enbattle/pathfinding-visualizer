@@ -1,11 +1,6 @@
 import { Stack, Queue, PriorityItem, PriorityQueueAscend } from '../models/models';
 import { getEuclideanDistance } from '../util/function-util';
-import type { CoordinateAndDirection, SearchNode } from "../models/models";
-
-// Schedules `callback` to run after `delay` ms. The caller (board.tsx) owns
-// timer bookkeeping/cancellation - this file only owns the *timing* (the
-// delay math below), not how the timeout is tracked or cleared.
-type ScheduleTimeout = (callback: () => void, delay: number) => void;
+import type { CoordinateAndDirection, SearchNode, ScheduleTimeout } from "../models/models";
 
 // The animation used to mutate DOM className directly on a timer, outside
 // React's render cycle. It now reports each visual change through these

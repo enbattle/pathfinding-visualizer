@@ -33,6 +33,14 @@ GitHub Pages via `.github/workflows/deploy.yml`.
   `walls.test.ts`'s "placed anywhere (e.g. after dragging)" suite - keep
   both that test and the widened-exclusion behavior if you touch the
   exclusion-zone logic.
+- Animation timing: every algorithm in `paths.tsx`/`walls.tsx` schedules
+  its animated steps through the injected `ScheduleTimeout` (defined in
+  `models.ts`, implemented by `board.tsx`), never `setTimeout` directly.
+  The board tracks every pending step so Reset can cancel it and so
+  Build Walls/Visualize are ignored while anything is still animating -
+  an untracked timer breaks both (regression tests in
+  `configurations.test.tsx`: "resetting mid-wall-build..." and "ignores
+  Visualize while walls are still being built").
 - `src/models/models.ts` - the typed data structures the algorithms run
   on: `Stack`/`Queue`/`PriorityQueueAscend` (a real binary heap, not a
   sort-per-push array - keep it that way, it's the difference between

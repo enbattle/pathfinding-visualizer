@@ -1,5 +1,5 @@
 import { evenRandIntBetween, oddRandIntBetween } from '../util/function-util';
-import type { CoordinateAndDirection } from "../models/models";
+import type { CoordinateAndDirection, ScheduleTimeout } from "../models/models";
 
 /**
  *
@@ -8,6 +8,7 @@ import type { CoordinateAndDirection } from "../models/models";
  * @param maxRows - total number of rows on the board
  * @param maxColumns - total number of columns on the board
  * @param buildWall - function that builds a wall on the board given a coordinate
+ * @param scheduleTimeout - schedules each animated wall placement (caller owns cancellation)
  */
 function drawBorderWalls(
   start: CoordinateAndDirection,
@@ -15,6 +16,7 @@ function drawBorderWalls(
   maxRows: number,
   maxColumns: number,
   buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
 
@@ -24,7 +26,7 @@ function drawBorderWalls(
     if(!(start.row === i && start.column === 0)
       && !(goal.row === i && goal.column === 0))
 
-      setTimeout(() =>
+      scheduleTimeout(() =>
         buildWall(i, 0),
         fillDelay
       );
@@ -35,7 +37,7 @@ function drawBorderWalls(
     if(!(start.row === maxRows-1 && start.column === i)
       && !(goal.row === maxRows-1 && goal.column === i))
 
-      setTimeout(() =>
+      scheduleTimeout(() =>
         buildWall(maxRows-1, i),
         fillDelay
       );
@@ -46,7 +48,7 @@ function drawBorderWalls(
     if(!(start.row === i && start.column === maxColumns-1)
       && !(goal.row === i && goal.column === maxColumns-1))
 
-      setTimeout(() =>
+      scheduleTimeout(() =>
       buildWall(i, maxColumns-1),
         fillDelay
       );
@@ -57,7 +59,7 @@ function drawBorderWalls(
     if(!(start.row === 0 && start.column === i)
       && !(goal.row === 0 && goal.column === i))
 
-      setTimeout(() =>
+      scheduleTimeout(() =>
         buildWall(0, i),
         fillDelay
       );
@@ -86,7 +88,7 @@ function getHorizontalOrientation(horizontalWidth: number, verticalLength: numbe
  * below are both thin wrappers over this, differing only in thickness.
  *
  * @param wallThickness - how many cells thick the dividing wall is
- * @param fillDelay - delay used by setTimeouts to fill the board for the end path
+ * @param fillDelay - starting delay (ms) for this call's scheduled wall placements for the end path
  * @param start - start coordinate
  * @param goal - goal coordinate
  * @param y - current minimum y value (row)
@@ -94,6 +96,7 @@ function getHorizontalOrientation(horizontalWidth: number, verticalLength: numbe
  * @param maxY - current maximum y value (row)
  * @param maxX - current maximum x value (column)
  * @param buildWall - function to build a wall on the board
+ * @param scheduleTimeout - schedules each animated wall placement (caller owns cancellation)
  * @param stepDelay - ms added to fillDelay per animated wall placement (speed control)
  * @returns none
  */
@@ -109,6 +112,7 @@ function buildDividingWalls(
   maxY: number,
   maxX: number,
   buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
 
@@ -158,7 +162,7 @@ function buildDividingWalls(
 
       if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
         for(let layer=0; layer<wallThickness; layer++) {
-          setTimeout(() =>
+          scheduleTimeout(() =>
             buildWall(wallY + layer, i),
             fillDelay
           );
@@ -168,8 +172,8 @@ function buildDividingWalls(
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, wallY-partitionOffset, maxX, buildWall, stepDelay);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, wallY+partitionOffset, x, maxY, maxX, buildWall, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, wallY-partitionOffset, maxX, buildWall, scheduleTimeout, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, wallY+partitionOffset, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
   }
   else {
     // Wall should be on an even column
@@ -188,7 +192,7 @@ function buildDividingWalls(
 
       if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
         for(let layer=0; layer<wallThickness; layer++) {
-          setTimeout(() =>
+          scheduleTimeout(() =>
             buildWall(i, wallX + layer),
             fillDelay
           );
@@ -198,8 +202,8 @@ function buildDividingWalls(
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, wallX-partitionOffset, buildWall, stepDelay);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, wallX+partitionOffset, maxY, maxX, buildWall, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, wallX-partitionOffset, buildWall, scheduleTimeout, stepDelay);
+    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, wallX+partitionOffset, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
   }
 }
 
@@ -217,9 +221,10 @@ function recursiveDivision(
   maxY: number,
   maxX: number,
   buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-  buildDividingWalls(1, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, stepDelay);
+  buildDividingWalls(1, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
 }
 
 /**
@@ -236,9 +241,10 @@ function recursiveDivisionTwoLayers(
   maxY: number,
   maxX: number,
   buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-  buildDividingWalls(2, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, stepDelay);
+  buildDividingWalls(2, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
 }
 
 /**
@@ -259,7 +265,7 @@ function recursiveDivisionTwoLayers(
  * through (their own connector) -> (the spanning tree) -> (the other's
  * connector).
  *
- * @param fillDelay - delay used by setTimeouts to fill the board
+ * @param fillDelay - starting delay (ms) for this call's scheduled wall placements
  * @param start - start coordinate
  * @param goal - goal coordinate
  * @param maxRows - total number of rows on the board (unused; kept for call-site parity with recursiveDivision/recursiveDivisionTwoLayers)
@@ -269,6 +275,7 @@ function recursiveDivisionTwoLayers(
  * @param maxY - current maximum y value (row) of the interior region
  * @param maxX - current maximum x value (column) of the interior region
  * @param buildWall - function to build a wall on the board
+ * @param scheduleTimeout - schedules each animated wall placement (caller owns cancellation)
  * @param stepDelay - ms added to fillDelay per animated wall placement (speed control)
  */
 function prims(
@@ -282,6 +289,7 @@ function prims(
   maxY: number,
   maxX: number,
   buildWall: (rowCoordinate: number, columnCoordinate: number) => void,
+  scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
   const key = (r: number, c: number) => r + "_" + c;
@@ -366,7 +374,7 @@ function prims(
       const isStart = start.row === r && start.column === c;
       const isGoal = goal.row === r && goal.column === c;
       if (!carved.has(key(r, c)) && !isStart && !isGoal) {
-        setTimeout(() => buildWall(r, c), delay);
+        scheduleTimeout(() => buildWall(r, c), delay);
         delay += stepDelay;
       }
     }

@@ -296,6 +296,46 @@ describe('Configuration (component/integration)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('resetting mid-wall-build cancels the remaining wall placements - regression test for untracked wall timers', () => {
+    vi.useFakeTimers();
+    render(<Configuration />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
+    act(() => {
+      vi.advanceTimersByTime(30);
+    });
+    expect(cellsWithClass('wall-fill').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset All' }));
+    expect(cellsWithClass('wall-fill').length).toBe(0);
+
+    // If the wall placements weren't tracked/cancelled, they'd keep landing
+    // on the freshly reset board here.
+    act(() => {
+      vi.advanceTimersByTime(100_000);
+    });
+    expect(cellsWithClass('wall-fill').length).toBe(0);
+  });
+
+  it('ignores Visualize while walls are still being built', () => {
+    vi.useFakeTimers();
+    render(<Configuration />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
+    act(() => {
+      vi.advanceTimersByTime(30);
+    });
+
+    // Searching a half-built maze would report a path through walls that
+    // are about to appear - the click must be dropped instead.
+    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
+    act(() => {
+      vi.advanceTimersByTime(100_000);
+    });
+    expect(cellsWithClass('board-fill').length).toBe(0);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('info dialog opens on click and closes on Escape', async () => {
     render(<Configuration />);
 

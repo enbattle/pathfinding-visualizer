@@ -121,10 +121,12 @@ const Board = ({
 	shouldResetBoard, setShouldResetBoard, shouldResetPath, setShouldResetPath, onError, onStats
 }: IBoardParameters) => {
 
-	// Contains all setTimeoutIds for the in-progress search animation, so an
-	// immediate Reset can cancel them (clearTimeout) instead of letting them
-	// keep firing and mutating state after the board's already been cleared.
-	const timeoutIdsRef = React.useRef<NodeJS.Timeout[]>([]);
+	// Contains all setTimeoutIds for the in-progress animation (wall building
+	// and path search alike), so an immediate Reset can cancel them
+	// (clearTimeout) instead of letting them keep firing and mutating state
+	// after the board's already been cleared. It also doubles as the "is
+	// anything still animating?" check that gates Build Walls/Visualize.
+	const timeoutIdsRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
 
 	// Contains all the walls on the board
 	const walls = React.useRef<Set<string>>(new Set<string>());
@@ -143,8 +145,8 @@ const Board = ({
 		buildInitialCells(rows, columns, startCoordinate, goalCoordinate)
 	);
 
-	// Schedules a timed animation step for the search algorithms
-	// (src/algorithms/paths.tsx) and tracks the timeout so it can be
+	// Schedules a timed animation step for the wall and search algorithms
+	// (src/algorithms/walls.tsx, src/algorithms/paths.tsx) and tracks the timeout so it can be
 	// cancelled on reset. paths.tsx owns the delay math; this just owns
 	// bookkeeping/cancellation.
 	const scheduleTimeout = React.useCallback((callback: () => void, delay: number): void => {
@@ -265,16 +267,16 @@ const Board = ({
 	// Draw border walls and add inner walls recursively
 	const addRecursiveWalls = (): void => {
 		if(wallAlgorithm === "RecursiveDivision") {
-			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
-			recursiveDivision(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, scheduleTimeout, stepDelay);
+			recursiveDivision(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, scheduleTimeout, stepDelay);
 		}
 		else if(wallAlgorithm === "RecursiveDivisionTwoLayers") {
-			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
-			recursiveDivisionTwoLayers(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, scheduleTimeout, stepDelay);
+			recursiveDivisionTwoLayers(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, scheduleTimeout, stepDelay);
 		}
 		else if(wallAlgorithm === "Prims") {
-			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, stepDelay);
-			prims(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, stepDelay);
+			drawBorderWalls(currentStart, currentGoal, rows, columns, buildWall, scheduleTimeout, stepDelay);
+			prims(0, currentStart, currentGoal, rows, columns, 1, 1, rows-2, columns-2, buildWall, scheduleTimeout, stepDelay);
 		}
 	}
 

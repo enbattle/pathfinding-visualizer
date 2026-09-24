@@ -27,9 +27,14 @@ function createAnimationHarness() {
   };
 }
 
-// recursiveDivision/recursiveDivisionTwoLayers stage their wall placements
-// through setTimeout (to animate them in the UI) - fake timers let a test
-// flush every pending wall placement synchronously.
+// The wall algorithms stage their wall placements through an injected
+// scheduler (board.tsx's tracked setTimeout, to animate them in the UI) -
+// backing it with setTimeout under fake timers lets a test flush every
+// pending wall placement synchronously.
+const scheduleWallPlacement = (callback: () => void, delay: number): void => {
+  setTimeout(callback, delay);
+};
+
 function collectWalls(build: (buildWall: (row: number, column: number) => void) => void): Set<string> {
   vi.useFakeTimers();
   const walls = new Set<string>();
@@ -58,7 +63,7 @@ describe('recursive division maze generation', () => {
     'recursiveDivision (single-thickness) leaves start and goal reachable (trial %i)',
     () => {
       const walls = collectWalls((buildWall) =>
-        recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+        recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
@@ -72,7 +77,7 @@ describe('recursive division maze generation', () => {
     'recursiveDivisionTwoLayers (double-thickness) leaves start and goal reachable (trial %i)',
     () => {
       const walls = collectWalls((buildWall) =>
-        recursiveDivisionTwoLayers(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+        recursiveDivisionTwoLayers(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
@@ -86,7 +91,7 @@ describe('recursive division maze generation', () => {
     "prims leaves start and goal reachable (trial %i)",
     () => {
       const walls = collectWalls((buildWall) =>
-        prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+        prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
@@ -98,7 +103,7 @@ describe('recursive division maze generation', () => {
 
   it("prims never places a wall directly on the start or goal cell", () => {
     const walls = collectWalls((buildWall) =>
-      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
     );
 
     expect(walls.has(`${start.row}_${start.column}`)).toBe(false);
@@ -111,7 +116,7 @@ describe('recursive division maze generation', () => {
     // pattern (or into an all-open / all-walled board).
     vi.spyOn(Math, 'random').mockReturnValue(0.37);
     const primsWalls = collectWalls((buildWall) =>
-      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
     );
     vi.restoreAllMocks();
 
@@ -126,7 +131,7 @@ describe('recursive division maze generation', () => {
     // doesn't need repeated-trial coverage the way reachability does.
     vi.spyOn(Math, 'random').mockReturnValue(0.42);
     const walls = collectWalls((buildWall) =>
-      recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+      recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
     );
     vi.restoreAllMocks();
 
@@ -164,7 +169,7 @@ describe('recursive division maze generation - start/goal placed anywhere (e.g. 
           }
 
           const walls = collectWalls((buildWall) =>
-            algorithm(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall)
+            algorithm(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
           );
 
           const { scheduleTimeout, animationCallbacks } = createAnimationHarness();

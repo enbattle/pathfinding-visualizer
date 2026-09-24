@@ -4,6 +4,13 @@ interface CoordinateAndDirection {
   direction: string;
 }
 
+// Schedules `callback` to run after `delay` ms. The board (board.tsx) owns
+// the implementation so it can track and cancel every pending step on reset;
+// the algorithms only decide *when* each step happens. Never call
+// setTimeout directly from an algorithm - an untracked timer can't be
+// cancelled and will keep mutating the board after a reset.
+type ScheduleTimeout = (callback: () => void, delay: number) => void;
+
 // A search-frontier entry: the coordinate being visited, and the path of
 // coordinates taken to reach it from the start.
 type SearchNode = [CoordinateAndDirection, CoordinateAndDirection[]];
@@ -153,6 +160,6 @@ class PriorityQueueAscend<T> extends PriorityQueueHeap<T> {
   }
 }
 
-export type { CoordinateAndDirection, SearchNode };
+export type { CoordinateAndDirection, SearchNode, ScheduleTimeout };
 
 export { Stack, Queue, PriorityItem, PriorityQueueAscend };
