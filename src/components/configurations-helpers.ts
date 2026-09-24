@@ -77,3 +77,13 @@ export function speedToStepDelay(speed: number): number {
   const t = 1 - speed / 100;
   return Math.round(MIN_STEP_DELAY + t * (MAX_STEP_DELAY - MIN_STEP_DELAY));
 }
+
+/** Playback speed in ticks (animation steps) per second for a slider position. */
+export function speedToRate(speed: number): number {
+  return 1000 / speedToStepDelay(speed);
+}
+
+/** Flat cell index of a coordinate on a board `columns` wide. */
+export function toCellIndex(coordinate: Coordinate, columns: number): number {
+  return coordinate.row * columns + coordinate.column;
+}

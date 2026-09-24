@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import Configuration from './configurations';
+import { FakeClock } from '../test-support/fake-clock';
+import { Visualizer, type VisualizerOptions } from '../visualizer/visualizer';
 
 // Forces the >=20 floor in computeBoardSize, giving every test the same
-// deterministic 20x20 board regardless of the real test-runner environment's
-// window size.
+// 20x20 board (start on row 18, goal on row 1) regardless of the test
+// runner's window size.
 function setSmallViewport(): void {
   Object.defineProperty(window, 'innerWidth', {
     value: 100,
@@ -19,398 +27,276 @@ function setSmallViewport(): void {
   });
 }
 
-function getCellById(row: number, column: number): HTMLTableCellElement {
-  const cell = document.getElementById(`${row}_${column}`);
-  if (!cell) throw new Error(`No cell found at ${row}_${column}`);
-  return cell as HTMLTableCellElement;
+const CELL = 10; // px per cell in the mocked canvas layout
+const COLUMNS = 20;
+
+let clock: FakeClock;
+let visualizer: Visualizer;
+
+function renderApp() {
+  clock = new FakeClock();
+  const createVisualizer = (options: VisualizerOptions) => {
+    visualizer = new Visualizer({ ...options, clock });
+    return visualizer;
+  };
+  const result = render(<Configuration createVisualizer={createVisualizer} />);
+  const canvas = screen.getByRole('application');
+  // jsdom doesn't lay out; give the canvas a 20x20-cell box at the origin.
+  canvas.getBoundingClientRect = () =>
+    ({
+      left: 0,
+      top: 0,
+      width: COLUMNS * CELL,
+      height: 20 * CELL,
+      right: COLUMNS * CELL,
+      bottom: 20 * CELL,
+      x: 0,
+      y: 0,
+    }) as DOMRect;
+  return { ...result, canvas };
 }
 
-function findAnchorCell(letter: 'S' | 'G'): HTMLTableCellElement {
-  const textNode = screen.getByText(letter, { selector: 'td' });
-  return textNode as HTMLTableCellElement;
+const index = (row: number, column: number) => row * COLUMNS + column;
+const point = (cell: number) => ({
+  clientX: (cell % COLUMNS) * CELL + CELL / 2,
+  clientY: Math.floor(cell / COLUMNS) * CELL + CELL / 2,
+  pointerId: 1,
+});
+
+function drag(canvas: HTMLElement, cells: number[]): void {
+  fireEvent.pointerDown(canvas, { ...point(cells[0]), button: 0 });
+  for (const cell of cells.slice(1)) fireEvent.pointerMove(canvas, point(cell));
+  fireEvent.pointerUp(canvas, point(cells[cells.length - 1]));
 }
 
-function cellsWithClass(className: string): HTMLTableCellElement[] {
-  return Array.from(document.querySelectorAll('td')).filter(td =>
-    td.className.split(' ').includes(className)
-  ) as HTMLTableCellElement[];
-}
+const click = (canvas: HTMLElement, cell: number) => drag(canvas, [cell]);
+const button = (name: string) => screen.getByRole('button', { name });
+const frames = (ms: number) => act(() => clock.advance(ms));
+const playToEnd = () => act(() => clock.runUntilIdle());
+const snapshot = () => visualizer.getSnapshot();
+const wallCount = () =>
+  snapshot().grid.walls.reduce((sum, wall) => sum + wall, 0);
 
-function rowColOf(cell: HTMLTableCellElement): { row: number; column: number } {
-  const [row, column] = cell.id.split('_').map(Number);
-  return { row, column };
-}
-
-// jsdom implements neither layout (getBoundingClientRect) nor hit-testing
-// (document.elementFromPoint always returns null) - the app's drag tracking
-// (board.tsx's handleWindowMouseMove -> cellAtPoint) depends on
-// elementFromPoint to figure out which cell the pointer is over on each
-// mousemove. Mocking it to return whatever cell the test says the pointer is
-// "over" (ignoring the actual, meaningless-in-jsdom clientX/clientY) is the
-// standard way to test elementFromPoint-driven drag logic under jsdom.
-let pointTarget: Element | null = null;
-
-function dragCell(from: HTMLTableCellElement, to: HTMLTableCellElement): void {
-  fireEvent.mouseDown(from, { button: 0 });
-  pointTarget = to;
-  act(() => {
-    window.dispatchEvent(
-      new MouseEvent('mousemove', { bubbles: true, clientX: 1, clientY: 1 })
-    );
-  });
-  act(() => {
-    window.dispatchEvent(
-      new MouseEvent('mouseup', { bubbles: true, button: 0 })
-    );
-  });
-}
-
-function dragThroughCells(cells: HTMLTableCellElement[]): void {
-  fireEvent.mouseDown(cells[0], { button: 0 });
-  for (let i = 1; i < cells.length; i++) {
-    pointTarget = cells[i];
-    act(() => {
-      window.dispatchEvent(
-        new MouseEvent('mousemove', { bubbles: true, clientX: i, clientY: i })
-      );
-    });
-  }
-  act(() => {
-    window.dispatchEvent(
-      new MouseEvent('mouseup', { bubbles: true, button: 0 })
-    );
-  });
+function stat(label: string): string {
+  const status = screen.getByRole('status');
+  const cell = within(status).getByText(label).parentElement as HTMLElement;
+  return cell.firstElementChild?.textContent ?? '';
 }
 
 describe('Configuration (component/integration)', () => {
-  beforeEach(() => {
-    setSmallViewport();
-    // jsdom doesn't implement elementFromPoint at all (not even a stub) -
-    // define it outright rather than vi.spyOn, which requires the property
-    // to already exist on the object.
-    document.elementFromPoint = vi.fn(() => pointTarget);
+  beforeEach(setSmallViewport);
+  afterEach(() => vi.restoreAllMocks());
+
+  it('Build Walls animates a maze onto the board', () => {
+    renderApp();
+    fireEvent.click(button('Build Walls'));
+    expect(wallCount()).toBeGreaterThan(0);
+    expect(visualizer.player.getState().playing).toBe(true);
+    playToEnd();
+    expect(visualizer.player.getState().playing).toBe(false);
   });
 
-  afterEach(() => {
-    pointTarget = null;
-    vi.restoreAllMocks();
-    if (vi.isFakeTimers()) vi.useRealTimers();
-  });
+  it('Visualize shows stats, with the visited count following playback', () => {
+    renderApp();
+    fireEvent.click(button('Visualize'));
+    expect(stat('Nodes visited')).toBe('0');
+    expect(Number(stat('Path length'))).toBeGreaterThan(0);
+    expect(stat('Algorithm time')).toMatch(/ms$/);
 
-  it('Build Walls adds wall-fill cells to the board', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(cellsWithClass('wall-fill').length).toBeGreaterThan(0);
-  });
-
-  it('Visualize on a clean board populates stats and a path overlay', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    const status = screen.getByRole('status');
-    const [visitedText, pathLengthText, timeText] = Array.from(
-      status.querySelectorAll('.font-bold')
-    ).map(el => el.textContent);
-    expect(Number(visitedText)).toBeGreaterThan(0);
-    expect(Number(pathLengthText)).toBeGreaterThan(0);
-    expect(timeText).toMatch(/ms$/);
-    expect(cellsWithClass('goal-path-fill').length).toBeGreaterThan(0);
+    frames(100);
+    const partway = Number(stat('Nodes visited'));
+    expect(partway).toBeGreaterThan(0);
+    playToEnd();
+    expect(Number(stat('Nodes visited'))).toBeGreaterThan(partway);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('Reset Path clears the path/visited overlay but leaves walls in place', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
+  it('playback controls pause, step and scrub the run', () => {
+    renderApp();
+    fireEvent.click(button('Visualize'));
+    frames(100);
+    fireEvent.click(button('Pause'));
+    const paused = visualizer.player.getState().tick;
+    frames(500);
+    expect(visualizer.player.getState().tick).toBe(paused);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
-    act(() => {
-      vi.runAllTimers();
+    fireEvent.click(button('Step forward'));
+    expect(visualizer.player.getState().tick).toBe(Math.floor(paused) + 1);
+    fireEvent.click(button('Step back'));
+    fireEvent.click(button('Step back'));
+    expect(visualizer.player.getState().tick).toBe(Math.floor(paused) - 1);
+
+    fireEvent.click(button('Skip to end'));
+    const { tick, length } = visualizer.player.getState();
+    expect(tick).toBe(length);
+    fireEvent.click(button('Play')); // at the end: replays from the start
+    expect(visualizer.player.getState()).toMatchObject({
+      tick: 0,
+      playing: true,
     });
-    const wallCountAfterBuild = cellsWithClass('wall-fill').length;
-    expect(wallCountAfterBuild).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(cellsWithClass('goal-path-fill').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset Path' }));
-
-    expect(cellsWithClass('goal-path-fill').length).toBe(0);
-    expect(cellsWithClass('board-fill').length).toBe(0);
-    expect(cellsWithClass('wall-fill').length).toBe(wallCountAfterBuild);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('Reset All clears walls and the path/visited overlay', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
+  it('Reset Path clears the run but leaves walls in place', () => {
+    renderApp();
+    fireEvent.click(button('Build Walls'));
+    playToEnd();
+    const walls = wallCount();
+    fireEvent.click(button('Visualize'));
+    playToEnd();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(cellsWithClass('wall-fill').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(cellsWithClass('goal-path-fill').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset All' }));
-
-    expect(cellsWithClass('wall-fill').length).toBe(0);
-    expect(cellsWithClass('goal-path-fill').length).toBe(0);
-    expect(cellsWithClass('board-fill').length).toBe(0);
+    fireEvent.click(button('Reset Path'));
+    expect(snapshot().run).toBeNull();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: 'Playback' })
+    ).not.toBeInTheDocument();
+    expect(wallCount()).toBe(walls);
+  });
+
+  it('Reset All clears walls and the run', () => {
+    renderApp();
+    fireEvent.click(button('Build Walls'));
+    playToEnd();
+    fireEvent.click(button('Visualize'));
+    fireEvent.click(button('Reset All'));
+    expect(wallCount()).toBe(0);
+    expect(snapshot().run).toBeNull();
   });
 
   it('paint mode controls whether a click paints a wall or weighted terrain', () => {
-    render(<Configuration />);
+    const { canvas } = renderApp();
+    click(canvas, index(5, 5));
+    expect(visualizer.cellKind(index(5, 5))).toBe('wall');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Weighted Terrain' }));
-
-    // Any interactive empty cell works - grab one far from the anchors.
-    const target = getCellById(10, 10);
-    fireEvent.mouseDown(target, { button: 0 });
-    fireEvent.mouseUp(window, { button: 0 });
-
-    expect(target.className.split(' ')).toContain('weight-fill');
-    expect(target.className.split(' ')).not.toContain('wall-fill');
+    fireEvent.click(button('Weighted Terrain'));
+    click(canvas, index(5, 6));
+    expect(visualizer.cellKind(index(5, 6))).toBe('weight');
   });
 
-  it('click-and-drag paints multiple cells from one gesture', () => {
-    render(<Configuration />);
+  it('click-and-drag paints, and a drag starting on a painted cell erases', () => {
+    const { canvas } = renderApp();
+    const cells = [index(5, 5), index(5, 6), index(5, 7), index(6, 7)];
+    drag(canvas, cells);
+    for (const cell of cells) expect(visualizer.cellKind(cell)).toBe('wall');
 
-    const cells = [
-      getCellById(5, 5),
-      getCellById(5, 6),
-      getCellById(5, 7),
-      getCellById(5, 8),
-    ];
-    dragThroughCells(cells);
-
-    for (const cell of cells) {
-      expect(cell.className.split(' ')).toContain('wall-fill');
-    }
+    drag(canvas, cells.slice().reverse());
+    for (const cell of cells) expect(visualizer.cellKind(cell)).toBe('empty');
   });
 
-  it('click-and-drag erases multiple previously-painted cells from one gesture', () => {
-    render(<Configuration />);
+  it('dragging start or goal moves the marker the search actually uses', () => {
+    const { canvas } = renderApp();
+    const { start, goal } = snapshot();
+    const newStart = index(10, 3);
+    const newGoal = index(10, 16);
+    drag(canvas, [start, newStart]);
+    drag(canvas, [goal, newGoal]);
+    expect(snapshot()).toMatchObject({ start: newStart, goal: newGoal });
 
-    const cells = [getCellById(6, 5), getCellById(6, 6), getCellById(6, 7)];
-    dragThroughCells(cells); // paint them first
-    for (const cell of cells) {
-      expect(cell.className.split(' ')).toContain('wall-fill');
-    }
-
-    dragThroughCells(cells); // second drag over already-painted cells erases
-
-    for (const cell of cells) {
-      expect(cell.className.split(' ')).not.toContain('wall-fill');
-    }
+    fireEvent.click(button('Visualize'));
+    const run = snapshot().run;
+    const path = run?.kind === 'search' ? run.result.path : null;
+    expect(path?.[0]).toBe(newStart);
+    expect(path?.[path.length - 1]).toBe(newGoal);
   });
 
-  it('dragging the start marker updates the actual coordinate the search algorithm uses, not just its visual position', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
+  it('editing after a search re-runs it live', () => {
+    const { canvas } = renderApp();
+    fireEvent.click(button('Visualize'));
+    playToEnd();
+    const { goal } = snapshot();
+    const moved = goal + 1;
+    drag(canvas, [goal, moved]);
+    const run = snapshot().run;
+    expect(run?.kind === 'search' && run.result.path?.at(-1)).toBe(moved);
+    expect(visualizer.player.getState().playing).toBe(false);
+  });
 
-    const goalCell = findAnchorCell('G');
-    const { row: goalRow, column: goalColumn } = rowColOf(goalCell);
-    // An empty cell directly adjacent to goal - if the drag only updates the
-    // visual `kind` and search still uses the stale old start position, the
-    // resulting path length would not be exactly 1.
-    const adjacentToGoal = getCellById(goalRow + 1, goalColumn);
-    expect(adjacentToGoal.className.split(' ')).not.toContain(
-      'board-cell-anchor'
-    );
+  it('resetting mid-visualization stops the animation', () => {
+    renderApp();
+    fireEvent.click(button('Visualize'));
+    frames(50);
+    fireEvent.click(button('Reset All'));
+    expect(clock.pendingFrames).toBe(0);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    frames(10_000);
+    expect(snapshot().run).toBeNull();
+  });
 
-    const startCellBefore = findAnchorCell('S');
-    const { row: oldStartRow, column: oldStartColumn } =
-      rowColOf(startCellBefore);
+  it('resetting mid-wall-build leaves no walls and no animation behind', () => {
+    renderApp();
+    fireEvent.click(button('Build Walls'));
+    frames(50);
+    fireEvent.click(button('Reset All'));
+    expect(wallCount()).toBe(0);
+    expect(clock.pendingFrames).toBe(0);
+    frames(10_000);
+    expect(wallCount()).toBe(0);
+  });
 
-    dragCell(startCellBefore, adjacentToGoal);
-
-    // Visual position moved.
-    expect(getCellById(oldStartRow, oldStartColumn).textContent).toBe('');
-    expect(findAnchorCell('S')).toBe(adjacentToGoal);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
+  it('Visualize during a wall build searches the finished maze', () => {
+    renderApp();
+    fireEvent.click(button('Build Walls'));
+    frames(50);
+    const walls = wallCount();
+    fireEvent.click(button('Visualize'));
+    expect(snapshot().run?.kind).toBe('search');
+    expect(wallCount()).toBe(walls);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    const status = screen.getByRole('status');
-    // Stats grid is [visitedCount, pathLength, algorithmTime] - path.length
-    // counts nodes (start + goal), so an adjacent pair is exactly 2. That
-    // only holds if runVisualizeAlgorithm used the updated coordinate; the
-    // stale old (far-away) start would produce a much longer path.
-    const pathLengthText = status.querySelectorAll('.font-bold')[1].textContent;
-    expect(pathLengthText).toBe('2');
   });
 
-  it('dragging the goal marker updates the actual coordinate the search algorithm uses, not just its visual position', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    const startCell = findAnchorCell('S');
-    const { row: startRow, column: startColumn } = rowColOf(startCell);
-    const adjacentToStart = getCellById(startRow - 1, startColumn);
-    expect(adjacentToStart.className.split(' ')).not.toContain(
-      'board-cell-anchor'
-    );
-
-    const goalCellBefore = findAnchorCell('G');
-    const { row: oldGoalRow, column: oldGoalColumn } = rowColOf(goalCellBefore);
-
-    dragCell(goalCellBefore, adjacentToStart);
-
-    expect(getCellById(oldGoalRow, oldGoalColumn).textContent).toBe('');
-    expect(findAnchorCell('G')).toBe(adjacentToStart);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    const status = screen.getByRole('status');
-    const pathLengthText = status.querySelectorAll('.font-bold')[1].textContent;
-    expect(pathLengthText).toBe('2');
+  it('speed slider changes the playback rate', () => {
+    renderApp();
+    const before = visualizer.player.getState().rate;
+    const thumb = screen.getByRole('slider', { name: 'Animation speed' });
+    fireEvent.keyDown(thumb, { key: 'Home' });
+    expect(visualizer.player.getState().rate).toBeLessThan(before);
   });
 
-  it('resetting mid-visualization cancels the in-flight animation - regression test for the reset-during-animation bug', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
+  it('the board is keyboard-operable', () => {
+    const { canvas } = renderApp();
+    act(() => canvas.focus());
+    const { start } = snapshot();
+    // Cursor starts on S; move up and paint.
+    fireEvent.keyDown(canvas, { key: 'ArrowUp' });
+    fireEvent.keyDown(canvas, { key: ' ' });
+    expect(visualizer.cellKind(start - COLUMNS)).toBe('wall');
+    expect(screen.getByText(/Row 18, column \d+: wall/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-
-    // Advance partway through the animation - enough for at least one
-    // onCellVisited callback to have fired, but nowhere near enough for the
-    // whole (400-cell) board to finish.
-    act(() => {
-      vi.advanceTimersByTime(30);
-    });
-    expect(cellsWithClass('board-fill').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset All' }));
-    expect(cellsWithClass('board-fill').length).toBe(0);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-
-    // Jump far past when the original run would have fully completed. If
-    // reset didn't actually cancel the pending timeouts, they'd still fire
-    // here and repopulate board-fill/status after the reset.
-    act(() => {
-      vi.advanceTimersByTime(100_000);
-    });
-    expect(cellsWithClass('board-fill').length).toBe(0);
-    expect(cellsWithClass('goal-path-fill').length).toBe(0);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('resetting mid-wall-build cancels the remaining wall placements - regression test for untracked wall timers', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
-    act(() => {
-      vi.advanceTimersByTime(30);
-    });
-    expect(cellsWithClass('wall-fill').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset All' }));
-    expect(cellsWithClass('wall-fill').length).toBe(0);
-
-    // If the wall placements weren't tracked/cancelled, they'd keep landing
-    // on the freshly reset board here.
-    act(() => {
-      vi.advanceTimersByTime(100_000);
-    });
-    expect(cellsWithClass('wall-fill').length).toBe(0);
-  });
-
-  it('ignores Visualize while walls are still being built', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Build Walls' }));
-    act(() => {
-      vi.advanceTimersByTime(30);
-    });
-
-    // Searching a half-built maze would report a path through walls that
-    // are about to appear - the click must be dropped instead.
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.advanceTimersByTime(100_000);
-    });
-    expect(cellsWithClass('board-fill').length).toBe(0);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // Pick S up, carry it right, drop it.
+    fireEvent.keyDown(canvas, { key: 'ArrowDown' });
+    fireEvent.keyDown(canvas, { key: ' ' });
+    fireEvent.keyDown(canvas, { key: 'ArrowRight' });
+    fireEvent.keyDown(canvas, { key: ' ' });
+    expect(snapshot().start).toBe(start + 1);
   });
 
   it('info dialog opens on click and closes on Escape', async () => {
-    render(<Configuration />);
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-    const infoIcon = document.querySelector('.cursor-help');
-    if (!infoIcon) throw new Error('info icon not found');
-    fireEvent.click(infoIcon);
-
+    renderApp();
+    fireEvent.click(button('About this app'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-
     fireEvent.keyDown(screen.getByRole('dialog'), {
       key: 'Escape',
       code: 'Escape',
     });
-
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     );
   });
 
   it('shows an error when the goal is sealed off, and clears it on reset', () => {
-    vi.useFakeTimers();
-    render(<Configuration />);
-
-    const goalCell = findAnchorCell('G');
-    const { row, column } = rowColOf(goalCell);
-    // Wall in every cardinal neighbor of goal (all exist - goal is placed
-    // one cell inside the border, never at row 0).
-    const neighbors = [
-      getCellById(row - 1, column),
-      getCellById(row + 1, column),
-      getCellById(row, column - 1),
-      getCellById(row, column + 1),
-    ];
-    for (const neighbor of neighbors) {
-      fireEvent.mouseDown(neighbor, { button: 0 });
-      fireEvent.mouseUp(window, { button: 0 });
-      expect(neighbor.className.split(' ')).toContain('wall-fill');
+    const { canvas } = renderApp();
+    const { goal } = snapshot();
+    for (const neighbor of [
+      goal - COLUMNS,
+      goal + COLUMNS,
+      goal - 1,
+      goal + 1,
+    ]) {
+      click(canvas, neighbor);
     }
-
-    fireEvent.click(screen.getByRole('button', { name: 'Visualize' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
+    fireEvent.click(button('Visualize'));
     expect(screen.getByRole('alert')).toHaveTextContent('No path was found');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset All' }));
+    fireEvent.click(button('Reset All'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

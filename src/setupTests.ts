@@ -22,3 +22,10 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver =
     ResizeObserverStub as unknown as typeof ResizeObserver;
 }
+
+// jsdom has no 2D canvas; getContext() would log a "not implemented" error
+// on every render. The board renderer skips drawing without a context, and
+// its drawing code is tested against a recording fake instead
+// (board-renderer.test.ts).
+HTMLCanvasElement.prototype.getContext = (() =>
+  null) as unknown as HTMLCanvasElement['getContext'];

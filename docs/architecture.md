@@ -3,18 +3,56 @@
 ## Layers
 
 ```
-src/engine/        pure TypeScript: grid, search, maze generation
+src/engine/        pure TS: grid, search, maze generation
       │            (no React, no DOM, no timers; randomness injected)
       ▼
-src/components/    React UI: snapshots board state into an engine Grid,
-                   runs the engine, animates the events it returns
+src/visualizer/    pure TS: board state + commands; turns engine output
+      │            into runs (per-cell reveal ticks)
+      │     src/player/   pure TS: a playhead moving over ticks in time
+      ▼            ▼
+src/components/    React: canvas renderer = f(snapshot, tick), input,
+                   controls
 ```
 
-The engine never knows it's being animated. It turns a problem into data
-(a list of events or wall placements), and the UI decides how and when to
-show that data. That split is what makes the algorithms testable in
-isolation and will let other views (a canvas renderer, a side-by-side
-"race" of several algorithms, a 3D view) reuse the same results.
+Each layer turns its input into data, and the next layer decides what to
+do with it. The engine never knows it's being animated: it returns events
+or wall placements. The visualizer turns those into a _run_, and the
+player only moves a number (the playhead tick). The renderer draws
+whatever that number says. So the algorithms are testable in isolation,
+playback needs no timers, and other views (a side-by-side "race" of
+several algorithms, a 3D view) can reuse the same runs.
+
+## Runs and playback
+
+A run records, for every cell, the tick at which it appears (or `NEVER`):
+
+- search runs: `discoverTick` (discovery order: tick 0, 1, 2, …), then
+  `pathTick` for interior path cells, after the last discovery
+- maze runs: `wallTick` (walls that share a tick appear together)
+
+A cell is visible at playhead `t` once its tick is below `t`, and its
+entrance animation runs over the next `rate × 0.35` ticks. So any frame,
+forwards or backwards, is a pure function of the board snapshot and `t`
+(`cellLayer()` / `drawBoard()` in `src/components/board-renderer.ts`).
+The `Player` advances `t` from `requestAnimationFrame` timestamps; pause,
+step, scrub and speed changes only move or re-rate that number.
+
+A run is computed in full the moment it starts, so interrupting one is
+always safe. The grid already contains the whole maze when its animation
+begins, which is why "Visualize" mid-build simply searches the finished
+maze. After a search, editing the board re-runs it instantly without
+animation, so the path follows the edit live.
+
+## Rendering and input
+
+The board is one `<canvas>`. Each frame fills settled cells in one path
+per color (a few `fill()` calls instead of one per cell), so a full
+1,378-cell frame at 2× pixel density takes about 4 ms in Chrome. Redraws
+are coalesced to one per animation frame and happen only when the
+snapshot or playhead changes. Pointer Events (mouse, touch and pen)
+become `Visualizer` gestures, and the canvas is also keyboard-operable:
+arrow keys move a cursor, Space paints or erases, and Space on S/G picks
+it up and drops it. A polite live region announces the cursor's cell.
 
 ## Data model
 
@@ -91,8 +129,16 @@ connected, deterministic per seed) and snapshots in `mazes.test.ts`.
   fast-check shrinks the input to a minimal counterexample.
 - **Snapshot tests** pin exact behavior on a fixed board/seed as readable
   ASCII, so a behavior change shows up as a diff in review.
-- **Component tests** (Testing Library) cover the UI: painting, dragging,
-  resets, and cancellation mid-animation.
+- **Model tests** cover the `Visualizer` (commands, gestures, live
+  re-run), including a property test that any random sequence of edits,
+  runs, frames and resets leaves a consistent board whose on-screen search
+  matches a fresh search. The `Player` is tested frame by frame with a
+  fake clock.
+- **Component tests** (Testing Library, jsdom) drive the real UI through a
+  fake clock injected via `createVisualizer`: pointer and keyboard input
+  on the canvas, playback controls, resets mid-animation. jsdom can't
+  draw, so drawing is tested against a recording fake 2D context
+  (`board-renderer.test.ts`).
 
 History note: the engine replaced `src/algorithms/`. Before that code was
 deleted, comparison tests showed BFS/DFS, all maze generators and the

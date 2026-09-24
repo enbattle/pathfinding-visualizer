@@ -1,20 +1,28 @@
 import React from 'react';
-import BoardMemo, { type RunStats } from './board';
 import {
   MAZE_ALGORITHMS,
   PATH_ALGORITHMS,
   type MazeAlgorithmId,
   type PathAlgorithmId,
 } from '../engine';
+import { discoveredAt } from '../visualizer/runs';
+import {
+  Visualizer,
+  type PaintMode,
+  type VisualizerOptions,
+} from '../visualizer/visualizer';
 import {
   computeBoardSize,
   computeBoardSizeFromDimensions,
   randomStartCoordinate,
   randomGoalCoordinate,
-  speedToStepDelay,
-  type Coordinate,
+  speedToRate,
+  toCellIndex,
   DEFAULT_SPEED,
 } from './configurations-helpers';
+import { BoardCanvas } from './board-canvas';
+import { PlaybackControls } from './playback-controls';
+import { usePlayerState, useVisualizerSnapshot } from './use-visualizer';
 import {
   BrickWallIcon,
   FlagIcon,
@@ -48,84 +56,62 @@ const LEGEND_ITEMS: { label: string; swatchClassName: string }[] = [
   { label: 'Path', swatchClassName: 'legend-swatch-path' },
 ];
 
-const Configuration = () => {
-  // Board size/start/goal all start unset and are seeded together, once,
-  // from boardAreaRef's own *measured* content box - not from
-  // window.innerWidth/innerHeight, which ignores the side panel/padding/
-  // gaps around the board and always overestimates its actual available
-  // space (that mismatch is what used to make the board overflow its
-  // container and force a page scrollbar on every load).
-  //
-  // This has to be a "mount BoardMemo only once we already know the right
-  // size" gate rather than "mount with a guess, then correct it": once
-  // mounted, BoardMemo's own memo comparator (see BoardConfigurationsAreEqual
-  // in board.tsx) deliberately ignores rows/columns, so a later correction
-  // would silently no-op and the board would keep whatever size it first
-  // mounted with regardless. Gating the mount on a real measurement instead
-  // means there's only ever one, already-correct, mount.
-  const [boardSize, setBoardSize] = React.useState<{
-    rows: number;
-    columns: number;
-  } | null>(null);
-  const [startCoordinate, setStartCoordinate] =
-    React.useState<Coordinate | null>(null);
-  const [goalCoordinate, setGoalCoordinate] = React.useState<Coordinate | null>(
-    null
-  );
-  const boardAreaRef = React.useRef<HTMLDivElement>(null);
+interface ConfigurationProps {
+  /** Dependency injection point for tests (e.g. a fake animation clock). */
+  createVisualizer?: (options: VisualizerOptions) => Visualizer;
+}
 
-  React.useLayoutEffect(() => {
-    const element = boardAreaRef.current;
-    if (!element) return;
+const defaultCreateVisualizer = (options: VisualizerOptions) =>
+  new Visualizer(options);
 
-    // jsdom (this project's test environment) never actually lays elements
-    // out, so clientWidth/clientHeight here are always 0 - falling back to
-    // the coarser window-based guess in that case is what keeps tests'
-    // synchronous render() calls seeing a board immediately, instead of
-    // waiting on a real layout measurement that will never arrive there.
-    const { clientWidth, clientHeight } = element;
-    const size =
-      clientWidth > 0 && clientHeight > 0
-        ? computeBoardSizeFromDimensions(clientWidth, clientHeight)
-        : computeBoardSize();
+function randomAnchors(rows: number, columns: number) {
+  return {
+    start: toCellIndex(randomStartCoordinate(rows, columns), columns),
+    goal: toCellIndex(randomGoalCoordinate(rows, columns), columns),
+  };
+}
 
-    setBoardSize(size);
-    setStartCoordinate(randomStartCoordinate(size.rows, size.columns));
-    setGoalCoordinate(randomGoalCoordinate(size.rows, size.columns));
-  }, []);
-
-  // Derived, fallback-safe view of the board size for use before the
-  // measurement above has run (e.g. the dimensions badge's very first
-  // render) - BoardMemo itself only ever renders with the real,
-  // non-fallback boardSize (see the guard around it below).
-  const rows = boardSize?.rows ?? 20;
-  const columns = boardSize?.columns ?? 20;
-
-  // Initialize board states
+const Configuration = ({
+  createVisualizer = defaultCreateVisualizer,
+}: ConfigurationProps) => {
   const [pathAlgorithm, setPathAlgorithm] =
     React.useState<PathAlgorithmId>('bfs');
   const [wallAlgorithm, setWallAlgorithm] =
     React.useState<MazeAlgorithmId>('recursive-division');
-  const [paintMode, setPaintMode] = React.useState<'wall' | 'weight'>('wall');
+  const [paintMode, setPaintMode] = React.useState<PaintMode>('wall');
   const [speed, setSpeed] = React.useState<number>(DEFAULT_SPEED);
-  const [shouldBuildWalls, setShouldBuildWalls] =
-    React.useState<boolean>(false);
-  const [shouldVisualizePathAlgorithm, setShouldVisualizePathAlgorithm] =
-    React.useState<boolean>(false);
-  const [shouldResetBoard, setShouldResetBoard] =
-    React.useState<boolean>(false);
-  const [shouldResetPath, setShouldResetPath] = React.useState<boolean>(false);
-
-  // Info Modal state
   const [openInfoModal, setOpenInfoModal] = React.useState<boolean>(false);
 
-  // Algorithm-run error state (e.g. no path found)
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  // The board's rows/columns are chosen once, from the board area's
+  // measured size, before the first paint; after that the canvas only
+  // rescales to fit (see BoardCanvas).
+  const boardAreaRef = React.useRef<HTMLDivElement>(null);
+  const [visualizer, setVisualizer] = React.useState<Visualizer | null>(null);
+  const initialSpeedRef = React.useRef(speed);
+  React.useLayoutEffect(() => {
+    const element = boardAreaRef.current;
+    if (!element) return;
+    // jsdom (the test environment) doesn't lay anything out, so a zero
+    // size falls back to a window-based estimate.
+    const { clientWidth, clientHeight } = element;
+    const { rows, columns } =
+      clientWidth > 0 && clientHeight > 0
+        ? computeBoardSizeFromDimensions(clientWidth, clientHeight)
+        : computeBoardSize();
+    const created = createVisualizer({
+      rows,
+      columns,
+      ...randomAnchors(rows, columns),
+      rate: speedToRate(initialSpeedRef.current),
+    });
+    setVisualizer(created);
+    return () => created.dispose();
+  }, [createVisualizer]);
 
-  // Live run stats (nodes visited, path length, algorithm time)
-  const [stats, setStats] = React.useState<RunStats | null>(null);
-
-  const stepDelay = speedToStepDelay(speed);
+  const changeSpeed = (value: number) => {
+    setSpeed(value);
+    visualizer?.setRate(speedToRate(value));
+  };
 
   return (
     <div className="flex min-h-screen flex-col items-start gap-4 p-4 lg:flex-row lg:gap-6 lg:p-6">
@@ -140,9 +126,7 @@ const Configuration = () => {
               size="icon-sm"
               className="cursor-help text-primary hover:bg-primary/10 hover:text-primary"
               aria-label="About this app"
-              onClick={() => {
-                setOpenInfoModal(true);
-              }}
+              onClick={() => setOpenInfoModal(true)}
             >
               <InfoIcon className="h-5 w-5" />
             </Button>
@@ -189,6 +173,10 @@ const Configuration = () => {
                   <RouteIcon className="inline h-6 w-6 align-text-bottom text-primary" />
                 </li>
                 <li>
+                  Pause, step through, or scrub any animation with the playback
+                  controls above the board.
+                </li>
+                <li>
                   To reset the start and goal coordinates, click on the "Reset
                   Start/Goal" button.{' '}
                   <FlagIcon className="inline h-6 w-6 align-text-bottom text-primary" />
@@ -199,7 +187,7 @@ const Configuration = () => {
                   <RotateCcwIcon className="inline h-6 w-6 align-text-bottom text-primary" />
                 </li>
                 <li>
-                  To reset the the board, click on the "Reset All" button.{' '}
+                  To reset the board, click on the "Reset All" button.{' '}
                   <RotateCcwIcon className="inline h-6 w-6 align-text-bottom text-primary" />
                 </li>
                 <li>
@@ -211,6 +199,13 @@ const Configuration = () => {
                   weighted terrain, depending on the paint mode selected below
                   the wall algorithm.
                 </li>
+                <li>
+                  Once a path is shown, editing the board updates it live.
+                </li>
+                <li>
+                  Keyboard: focus the board, move with the arrow keys, and press
+                  Space to paint or erase, or to pick up and drop S or G.
+                </li>
               </ul>
             </div>
           </DialogContent>
@@ -218,7 +213,7 @@ const Configuration = () => {
 
         <CardContent className="flex flex-col gap-5 px-5">
           {/* Wall Algorithm type - Build Walls is this section's terminal
-					    action, so nothing else shares its row. */}
+              action, so nothing else shares its row. */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="wallAlgorithmChoices">Wall Algorithm</Label>
             <Select
@@ -245,7 +240,8 @@ const Configuration = () => {
             <Button
               type="button"
               className="mt-1"
-              onClick={() => setShouldBuildWalls(true)}
+              disabled={!visualizer}
+              onClick={() => visualizer?.buildMaze(wallAlgorithm)}
             >
               <BrickWallIcon /> Build Walls
             </Button>
@@ -254,7 +250,7 @@ const Configuration = () => {
           <Separator />
 
           {/* Paint mode - what a manual click/drag on the board paints,
-					    independent of the wall algorithm above. */}
+              independent of the wall algorithm above. */}
           <div className="flex flex-col gap-2">
             <Label id="paintModeLabel">Paint Mode</Label>
             <div
@@ -297,7 +293,7 @@ const Configuration = () => {
               value={[speed]}
               min={0}
               max={100}
-              onValueChange={([value]) => setSpeed(value)}
+              onValueChange={([value]) => changeSpeed(value)}
             />
           </div>
 
@@ -329,50 +325,14 @@ const Configuration = () => {
             <Button
               type="button"
               className="mt-1"
-              onClick={() => setShouldVisualizePathAlgorithm(true)}
+              disabled={!visualizer}
+              onClick={() => visualizer?.visualize(pathAlgorithm)}
             >
               <RouteIcon /> Visualize
             </Button>
           </div>
 
-          {stats && (
-            <div
-              className="grid grid-cols-3 gap-2 rounded-md border border-border bg-muted/50 p-3 text-center"
-              role="status"
-            >
-              <div>
-                <div className="text-lg font-bold">{stats.visitedCount}</div>
-                <div className="text-xs text-muted-foreground">
-                  Nodes visited
-                </div>
-              </div>
-              <div>
-                <div className="text-lg font-bold">
-                  {stats.pathLength ?? '—'}
-                </div>
-                <div className="text-xs text-muted-foreground">Path length</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold">
-                  {stats.algorithmTimeMs >= 0
-                    ? `${stats.algorithmTimeMs.toFixed(2)}ms`
-                    : '…'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Algorithm time
-                </div>
-              </div>
-            </div>
-          )}
-
-          {errorMessage && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            >
-              {errorMessage}
-            </div>
-          )}
+          {visualizer && <RunSummary visualizer={visualizer} />}
 
           <Separator />
 
@@ -381,12 +341,11 @@ const Configuration = () => {
               type="button"
               variant="outline"
               size="sm"
+              disabled={!visualizer}
               onClick={() => {
-                setStartCoordinate(randomStartCoordinate(rows, columns));
-                setGoalCoordinate(randomGoalCoordinate(rows, columns));
-                setErrorMessage(null);
-                setStats(null);
-                setShouldResetBoard(true);
+                if (!visualizer) return;
+                const { rows, columns } = visualizer.getSnapshot().grid;
+                visualizer.resetAll(randomAnchors(rows, columns));
               }}
             >
               Reset Start/Goal
@@ -395,11 +354,8 @@ const Configuration = () => {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                setErrorMessage(null);
-                setStats(null);
-                setShouldResetPath(true);
-              }}
+              disabled={!visualizer}
+              onClick={() => visualizer?.resetPath()}
             >
               Reset Path
             </Button>
@@ -407,11 +363,8 @@ const Configuration = () => {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                setErrorMessage(null);
-                setStats(null);
-                setShouldResetBoard(true);
-              }}
+              disabled={!visualizer}
+              onClick={() => visualizer?.resetAll()}
             >
               Reset All
             </Button>
@@ -421,54 +374,22 @@ const Configuration = () => {
 
       {/* Board Area */}
       <Card className="min-h-[28rem] min-w-0 flex-1 gap-0 self-stretch overflow-hidden py-0">
-        <CardHeader className="flex-row items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <Grid3x3Icon className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Board</CardTitle>
           </div>
-          <Badge
-            variant="outline"
-            className="font-normal text-muted-foreground"
-          >
-            {rows} × {columns} cells
-          </Badge>
+          {visualizer && <BoardHeader visualizer={visualizer} />}
         </CardHeader>
         <CardContent className="min-h-0 flex-1 p-0">
           {/* boardAreaRef measures this inner div's own content box (no
-					    padding of its own) to size the grid - the visual inset
-					    lives on this wrapper instead, so it never gets counted as
-					    part of the board's available space. */}
+              padding of its own) to size the grid - the visual inset lives
+              on this wrapper instead, so it never gets counted as part of
+              the board's available space. */}
           <div className="h-full w-full bg-background/40 p-3">
-            {/* Always rendered (even before boardSize resolves) - the
-						    layout effect above needs this element mounted so it has
-						    something to measure in the first place. */}
-            <div
-              ref={boardAreaRef}
-              className="board-scroll h-full w-full overflow-auto"
-            >
-              {boardSize && startCoordinate && goalCoordinate && (
-                <BoardMemo
-                  rows={boardSize.rows}
-                  columns={boardSize.columns}
-                  startCoordinate={startCoordinate}
-                  goalCoordinate={goalCoordinate}
-                  pathAlgorithm={pathAlgorithm}
-                  wallAlgorithm={wallAlgorithm}
-                  paintMode={paintMode}
-                  stepDelay={stepDelay}
-                  shouldBuildWalls={shouldBuildWalls}
-                  setShouldBuildWalls={setShouldBuildWalls}
-                  shouldVisualizePathAlgorithm={shouldVisualizePathAlgorithm}
-                  setShouldVisualizePathAlgorithm={
-                    setShouldVisualizePathAlgorithm
-                  }
-                  shouldResetBoard={shouldResetBoard}
-                  setShouldResetBoard={setShouldResetBoard}
-                  shouldResetPath={shouldResetPath}
-                  setShouldResetPath={setShouldResetPath}
-                  onError={setErrorMessage}
-                  onStats={setStats}
-                />
+            <div ref={boardAreaRef} className="h-full w-full">
+              {visualizer && (
+                <BoardCanvas visualizer={visualizer} paintMode={paintMode} />
               )}
             </div>
           </div>
@@ -477,5 +398,68 @@ const Configuration = () => {
     </div>
   );
 };
+
+// Board size, plus playback controls while a run is on screen.
+function BoardHeader({ visualizer }: { visualizer: Visualizer }) {
+  const { grid, run } = useVisualizerSnapshot(visualizer);
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+      {run && (
+        <div className="max-w-md min-w-0 flex-1">
+          <PlaybackControls player={visualizer.player} runLength={run.length} />
+        </div>
+      )}
+      <Badge variant="outline" className="font-normal text-muted-foreground">
+        {grid.rows} × {grid.columns} cells
+      </Badge>
+    </div>
+  );
+}
+
+// Stats for the search on screen (the visited count follows the
+// playhead), and the no-path error.
+function RunSummary({ visualizer }: { visualizer: Visualizer }) {
+  const { run, error } = useVisualizerSnapshot(visualizer);
+  const { tick } = usePlayerState(visualizer.player);
+  const search = run?.kind === 'search' ? run : null;
+
+  return (
+    <>
+      {search && (
+        <div
+          className="grid grid-cols-3 gap-2 rounded-md border border-border bg-muted/50 p-3 text-center"
+          role="status"
+        >
+          <div>
+            <div className="text-lg font-bold">
+              {discoveredAt(search, tick)}
+            </div>
+            <div className="text-xs text-muted-foreground">Nodes visited</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold">
+              {search.result.path?.length ?? '—'}
+            </div>
+            <div className="text-xs text-muted-foreground">Path length</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold">
+              {`${search.searchMs.toFixed(2)}ms`}
+            </div>
+            <div className="text-xs text-muted-foreground">Algorithm time</div>
+          </div>
+        </div>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+    </>
+  );
+}
 
 export default Configuration;

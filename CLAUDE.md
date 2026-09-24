@@ -38,15 +38,27 @@ changes.
     `seededRandom(seed)` in tests. No bare `Math.random()` in algorithms.
   - `collections.ts` - `Stack`/`Queue` (O(1)) and `MinHeap` (binary heap
     with a tiebreak key). Keep them O(1)/O(log n).
-- `src/components/` - React UI. `board.tsx` snapshots its state into an
-  engine `Grid`, runs the engine, and animates the result;
-  `path-segments.ts` picks the CSS class for each cell of the final path.
-- Animation timing: every animated step goes through `board.tsx`'s
-  `scheduleTimeout`, never a bare `setTimeout`. The board tracks every
-  pending step so Reset can cancel it and so Build Walls/Visualize are
-  ignored while anything is still animating (regression tests in
-  `configurations.test.tsx`: "resetting mid-wall-build..." and "ignores
-  Visualize while walls are still being built").
+- `src/player/player.ts` - the playhead: moves a tick position over time
+  via an injected `FrameClock` (requestAnimationFrame in the app,
+  `test-support/fake-clock.ts` in tests). Play/pause/step/seek/rate.
+- `src/visualizer/` - pure TS app state, no React/DOM.
+  - `visualizer.ts` - `Visualizer`: the board (grid, start/goal), the run
+    on screen, the `player`, every user command (visualize, buildMaze,
+    resets) and the paint/drag gesture rules. Runs are computed in full
+    up front; playback only decides how much is shown.
+  - `runs.ts` - a run as per-cell reveal ticks (`discoverTick`,
+    `pathTick`, `wallTick`): cell `i` is visible once the playhead passes
+    its tick. That's what makes scrubbing/stepping trivial.
+- `src/components/` - React UI, kept thin. `board-renderer.ts` draws a
+  frame as a pure function of (snapshot, tick) - `cellLayer()` holds the
+  "what does this cell look like now" logic and is unit-tested;
+  `board-canvas.tsx` does sizing, redraw scheduling, pointer and keyboard
+  input; `playback-controls.tsx`; `configurations.tsx` is the page.
+- Animation: never use `setTimeout`/`setInterval` to animate. Anything
+  that changes over time goes through the `Player`, and everything drawn
+  must be derivable from (snapshot, tick) - otherwise scrubbing breaks.
+- Board colors are CSS custom properties (`--board-*` in `index.css`),
+  read by `readPalette()`. Keep them hex: the renderer blends them.
 
 ## Testing conventions
 

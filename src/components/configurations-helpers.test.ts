@@ -4,6 +4,7 @@ import {
   randomStartCoordinate,
   randomGoalCoordinate,
   speedToStepDelay,
+  speedToRate,
   CELL_SIZE_PX,
   MIN_STEP_DELAY,
   MAX_STEP_DELAY,
@@ -38,6 +39,13 @@ describe('speedToStepDelay', () => {
       expect(current).toBeLessThanOrEqual(previous);
       previous = current;
     }
+  });
+});
+
+describe('speedToRate', () => {
+  it('is the step rate per second for the step delay', () => {
+    expect(speedToRate(100)).toBe(1000 / MIN_STEP_DELAY);
+    expect(speedToRate(0)).toBe(1000 / MAX_STEP_DELAY);
   });
 });
 
