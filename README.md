@@ -5,16 +5,18 @@ Welcome to my Pathfinding Visualizer! In a recent pursuit, I had been exposed to
 You can access it here: https://enbattle.github.io/pathfinding-visualizer/
 
 ## Current Pathfinding Algorithm Selection
-  - Dijkstra's Algorithm
-  - A* Search
-  - Greedy Best-first Search
-  - Breadth-first Search
-  - Depth-first Search
+
+- Dijkstra's Algorithm
+- A* Search
+- Greedy Best-first Search
+- Breadth-first Search
+- Depth-first Search
 
 ## Current Wall-Building Algorithm Selection
-  - Recursive Division
-  - Twin Recursive Division
-  - Prim's Algorithm
+
+- Recursive Division
+- Twin Recursive Division
+- Prim's Algorithm
 
 ## Development
 

@@ -1,5 +1,5 @@
 import { evenRandIntBetween, oddRandIntBetween } from '../util/function-util';
-import type { CoordinateAndDirection, ScheduleTimeout } from "../models/models";
+import type { CoordinateAndDirection, ScheduleTimeout } from '../models/models';
 
 /**
  *
@@ -19,51 +19,42 @@ function drawBorderWalls(
   scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-
   let fillDelay = 0;
 
-  for(let i=0; i<maxRows; i++) {
-    if(!(start.row === i && start.column === 0)
-      && !(goal.row === i && goal.column === 0))
-
-      scheduleTimeout(() =>
-        buildWall(i, 0),
-        fillDelay
-      );
-      fillDelay += stepDelay;
+  for (let i = 0; i < maxRows; i++) {
+    if (
+      !(start.row === i && start.column === 0) &&
+      !(goal.row === i && goal.column === 0)
+    )
+      scheduleTimeout(() => buildWall(i, 0), fillDelay);
+    fillDelay += stepDelay;
   }
 
-  for(let i=0; i<maxColumns; i++) {
-    if(!(start.row === maxRows-1 && start.column === i)
-      && !(goal.row === maxRows-1 && goal.column === i))
-
-      scheduleTimeout(() =>
-        buildWall(maxRows-1, i),
-        fillDelay
-      );
-      fillDelay += stepDelay;
+  for (let i = 0; i < maxColumns; i++) {
+    if (
+      !(start.row === maxRows - 1 && start.column === i) &&
+      !(goal.row === maxRows - 1 && goal.column === i)
+    )
+      scheduleTimeout(() => buildWall(maxRows - 1, i), fillDelay);
+    fillDelay += stepDelay;
   }
 
-  for(let i=maxRows-1; i>=0; i--) {
-    if(!(start.row === i && start.column === maxColumns-1)
-      && !(goal.row === i && goal.column === maxColumns-1))
-
-      scheduleTimeout(() =>
-      buildWall(i, maxColumns-1),
-        fillDelay
-      );
-      fillDelay += stepDelay;
+  for (let i = maxRows - 1; i >= 0; i--) {
+    if (
+      !(start.row === i && start.column === maxColumns - 1) &&
+      !(goal.row === i && goal.column === maxColumns - 1)
+    )
+      scheduleTimeout(() => buildWall(i, maxColumns - 1), fillDelay);
+    fillDelay += stepDelay;
   }
 
-  for(let i=maxColumns-1; i>=0; i--) {
-    if(!(start.row === 0 && start.column === i)
-      && !(goal.row === 0 && goal.column === i))
-
-      scheduleTimeout(() =>
-        buildWall(0, i),
-        fillDelay
-      );
-      fillDelay += stepDelay;
+  for (let i = maxColumns - 1; i >= 0; i--) {
+    if (
+      !(start.row === 0 && start.column === i) &&
+      !(goal.row === 0 && goal.column === i)
+    )
+      scheduleTimeout(() => buildWall(0, i), fillDelay);
+    fillDelay += stepDelay;
   }
 }
 
@@ -74,9 +65,12 @@ function drawBorderWalls(
  * @returns boolean determining whether to build a horizontal or vertical wall
  *  (i.e. if wall is wider, cut vertically, if wall is longer, cut horizontally)
  */
-function getHorizontalOrientation(horizontalWidth: number, verticalLength: number): boolean {
-  if(horizontalWidth > verticalLength) return false;
-  else if(horizontalWidth < verticalLength) return true;
+function getHorizontalOrientation(
+  horizontalWidth: number,
+  verticalLength: number
+): boolean {
+  if (horizontalWidth > verticalLength) return false;
+  else if (horizontalWidth < verticalLength) return true;
   else return Math.random() < 0.5 ? true : false;
 }
 
@@ -115,18 +109,17 @@ function buildDividingWalls(
   scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-
   // A wall this thick needs this much room on either side of it before the
   // next partition can start - below that, stop dividing this partition.
   const partitionOffset = 2 * wallThickness - 1;
 
   // if no more walls can be built, return
-  if(maxX-x < partitionOffset || maxY-y < partitionOffset) return;
+  if (maxX - x < partitionOffset || maxY - y < partitionOffset) return;
 
   // Determine whether a horizontal or vertical wall should be built
   // i.e. if an area is wider (left to right), vertical walls are preferred,
   // and if an area is longer (top to bottom), horizontal walls are preferred
-  const horizontalOrientation = getHorizontalOrientation(maxX-x, maxY-y);
+  const horizontalOrientation = getHorizontalOrientation(maxX - x, maxY - y);
 
   // Is `position` within the safety buffer around a wall starting at
   // `wallStart`? Cells here are skipped when laying the wall so start/goal
@@ -145,7 +138,7 @@ function buildDividingWalls(
   const isEmbeddedInWall = (position: number, wallStart: number) =>
     position >= wallStart && position < wallStart + wallThickness;
 
-  if(horizontalOrientation) {
+  if (horizontalOrientation) {
     // Wall should be on an even row
     const wallY = evenRandIntBetween(y, maxY);
 
@@ -153,29 +146,59 @@ function buildDividingWalls(
     const openingX = oddRandIntBetween(x, maxX);
 
     // Fill walls
-    for(let i=x; i<=maxX; i++) {
+    for (let i = x; i <= maxX; i++) {
       const isOpening = openingX === i;
-      const wouldTrapStart = inSafetyBuffer(start.row, wallY) &&
-        (isEmbeddedInWall(start.row, wallY) ? Math.abs(i - start.column) <= 1 : i === start.column);
-      const wouldTrapGoal = inSafetyBuffer(goal.row, wallY) &&
-        (isEmbeddedInWall(goal.row, wallY) ? Math.abs(i - goal.column) <= 1 : i === goal.column);
+      const wouldTrapStart =
+        inSafetyBuffer(start.row, wallY) &&
+        (isEmbeddedInWall(start.row, wallY)
+          ? Math.abs(i - start.column) <= 1
+          : i === start.column);
+      const wouldTrapGoal =
+        inSafetyBuffer(goal.row, wallY) &&
+        (isEmbeddedInWall(goal.row, wallY)
+          ? Math.abs(i - goal.column) <= 1
+          : i === goal.column);
 
-      if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
-        for(let layer=0; layer<wallThickness; layer++) {
-          scheduleTimeout(() =>
-            buildWall(wallY + layer, i),
-            fillDelay
-          );
+      if (!isOpening && !wouldTrapStart && !wouldTrapGoal) {
+        for (let layer = 0; layer < wallThickness; layer++) {
+          scheduleTimeout(() => buildWall(wallY + layer, i), fillDelay);
         }
         fillDelay += stepDelay;
       }
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, wallY-partitionOffset, maxX, buildWall, scheduleTimeout, stepDelay);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, wallY+partitionOffset, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
-  }
-  else {
+    buildDividingWalls(
+      wallThickness,
+      fillDelay,
+      start,
+      goal,
+      maxRows,
+      maxColumns,
+      y,
+      x,
+      wallY - partitionOffset,
+      maxX,
+      buildWall,
+      scheduleTimeout,
+      stepDelay
+    );
+    buildDividingWalls(
+      wallThickness,
+      fillDelay,
+      start,
+      goal,
+      maxRows,
+      maxColumns,
+      wallY + partitionOffset,
+      x,
+      maxY,
+      maxX,
+      buildWall,
+      scheduleTimeout,
+      stepDelay
+    );
+  } else {
     // Wall should be on an even column
     const wallX = evenRandIntBetween(x, maxX);
 
@@ -183,27 +206,58 @@ function buildDividingWalls(
     const openingY = oddRandIntBetween(y, maxY);
 
     // Fill walls
-    for(let i=y; i<=maxY; i++) {
+    for (let i = y; i <= maxY; i++) {
       const isOpening = openingY === i;
-      const wouldTrapStart = inSafetyBuffer(start.column, wallX) &&
-        (isEmbeddedInWall(start.column, wallX) ? Math.abs(i - start.row) <= 1 : i === start.row);
-      const wouldTrapGoal = inSafetyBuffer(goal.column, wallX) &&
-        (isEmbeddedInWall(goal.column, wallX) ? Math.abs(i - goal.row) <= 1 : i === goal.row);
+      const wouldTrapStart =
+        inSafetyBuffer(start.column, wallX) &&
+        (isEmbeddedInWall(start.column, wallX)
+          ? Math.abs(i - start.row) <= 1
+          : i === start.row);
+      const wouldTrapGoal =
+        inSafetyBuffer(goal.column, wallX) &&
+        (isEmbeddedInWall(goal.column, wallX)
+          ? Math.abs(i - goal.row) <= 1
+          : i === goal.row);
 
-      if(!isOpening && !wouldTrapStart && !wouldTrapGoal) {
-        for(let layer=0; layer<wallThickness; layer++) {
-          scheduleTimeout(() =>
-            buildWall(i, wallX + layer),
-            fillDelay
-          );
+      if (!isOpening && !wouldTrapStart && !wouldTrapGoal) {
+        for (let layer = 0; layer < wallThickness; layer++) {
+          scheduleTimeout(() => buildWall(i, wallX + layer), fillDelay);
         }
         fillDelay += stepDelay;
       }
     }
 
     // Decrease area and recurse
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, wallX-partitionOffset, buildWall, scheduleTimeout, stepDelay);
-    buildDividingWalls(wallThickness, fillDelay, start, goal, maxRows, maxColumns, y, wallX+partitionOffset, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
+    buildDividingWalls(
+      wallThickness,
+      fillDelay,
+      start,
+      goal,
+      maxRows,
+      maxColumns,
+      y,
+      x,
+      maxY,
+      wallX - partitionOffset,
+      buildWall,
+      scheduleTimeout,
+      stepDelay
+    );
+    buildDividingWalls(
+      wallThickness,
+      fillDelay,
+      start,
+      goal,
+      maxRows,
+      maxColumns,
+      y,
+      wallX + partitionOffset,
+      maxY,
+      maxX,
+      buildWall,
+      scheduleTimeout,
+      stepDelay
+    );
   }
 }
 
@@ -224,7 +278,21 @@ function recursiveDivision(
   scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-  buildDividingWalls(1, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
+  buildDividingWalls(
+    1,
+    fillDelay,
+    start,
+    goal,
+    maxRows,
+    maxColumns,
+    y,
+    x,
+    maxY,
+    maxX,
+    buildWall,
+    scheduleTimeout,
+    stepDelay
+  );
 }
 
 /**
@@ -244,7 +312,21 @@ function recursiveDivisionTwoLayers(
   scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-  buildDividingWalls(2, fillDelay, start, goal, maxRows, maxColumns, y, x, maxY, maxX, buildWall, scheduleTimeout, stepDelay);
+  buildDividingWalls(
+    2,
+    fillDelay,
+    start,
+    goal,
+    maxRows,
+    maxColumns,
+    y,
+    x,
+    maxY,
+    maxX,
+    buildWall,
+    scheduleTimeout,
+    stepDelay
+  );
 }
 
 /**
@@ -292,7 +374,7 @@ function prims(
   scheduleTimeout: ScheduleTimeout,
   stepDelay: number = 10
 ): void {
-  const key = (r: number, c: number) => r + "_" + c;
+  const key = (r: number, c: number) => r + '_' + c;
 
   const carved = new Set<string>();
 
@@ -327,24 +409,42 @@ function prims(
     const visited = new Set<string>();
     // Each frontier entry is a not-yet-visited chamber, and the
     // already-visited chamber it would be carved in from.
-    const frontier: { row: number; column: number; fromRow: number; fromColumn: number }[] = [];
+    const frontier: {
+      row: number;
+      column: number;
+      fromRow: number;
+      fromColumn: number;
+    }[] = [];
 
     const addFrontier = (row: number, column: number): void => {
       const neighbors: [number, number][] = [
         [row - 2, column],
         [row + 2, column],
         [row, column - 2],
-        [row, column + 2]
+        [row, column + 2],
       ];
       for (const [nr, nc] of neighbors) {
-        if (nr >= y && nr <= maxY && nc >= x && nc <= maxX && !visited.has(key(nr, nc))) {
-          frontier.push({ row: nr, column: nc, fromRow: row, fromColumn: column });
+        if (
+          nr >= y &&
+          nr <= maxY &&
+          nc >= x &&
+          nc <= maxX &&
+          !visited.has(key(nr, nc))
+        ) {
+          frontier.push({
+            row: nr,
+            column: nc,
+            fromRow: row,
+            fromColumn: column,
+          });
         }
       }
     };
 
-    const startChamberRow = chamberRows[Math.floor(Math.random() * chamberRows.length)];
-    const startChamberColumn = chamberColumns[Math.floor(Math.random() * chamberColumns.length)];
+    const startChamberRow =
+      chamberRows[Math.floor(Math.random() * chamberRows.length)];
+    const startChamberColumn =
+      chamberColumns[Math.floor(Math.random() * chamberColumns.length)];
 
     visited.add(key(startChamberRow, startChamberColumn));
     carved.add(key(startChamberRow, startChamberColumn));
@@ -385,5 +485,5 @@ export {
   recursiveDivision,
   recursiveDivisionTwoLayers,
   prims,
-  drawBorderWalls
-}
+  drawBorderWalls,
+};

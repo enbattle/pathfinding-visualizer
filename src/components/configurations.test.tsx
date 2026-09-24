@@ -7,8 +7,16 @@ import Configuration from './configurations';
 // deterministic 20x20 board regardless of the real test-runner environment's
 // window size.
 function setSmallViewport(): void {
-  Object.defineProperty(window, 'innerWidth', { value: 100, configurable: true, writable: true });
-  Object.defineProperty(window, 'innerHeight', { value: 100, configurable: true, writable: true });
+  Object.defineProperty(window, 'innerWidth', {
+    value: 100,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    value: 100,
+    configurable: true,
+    writable: true,
+  });
 }
 
 function getCellById(row: number, column: number): HTMLTableCellElement {
@@ -23,7 +31,7 @@ function findAnchorCell(letter: 'S' | 'G'): HTMLTableCellElement {
 }
 
 function cellsWithClass(className: string): HTMLTableCellElement[] {
-  return Array.from(document.querySelectorAll('td')).filter((td) =>
+  return Array.from(document.querySelectorAll('td')).filter(td =>
     td.className.split(' ').includes(className)
   ) as HTMLTableCellElement[];
 }
@@ -46,10 +54,14 @@ function dragCell(from: HTMLTableCellElement, to: HTMLTableCellElement): void {
   fireEvent.mouseDown(from, { button: 0 });
   pointTarget = to;
   act(() => {
-    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 1, clientY: 1 }));
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { bubbles: true, clientX: 1, clientY: 1 })
+    );
   });
   act(() => {
-    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    window.dispatchEvent(
+      new MouseEvent('mouseup', { bubbles: true, button: 0 })
+    );
   });
 }
 
@@ -58,11 +70,15 @@ function dragThroughCells(cells: HTMLTableCellElement[]): void {
   for (let i = 1; i < cells.length; i++) {
     pointTarget = cells[i];
     act(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: i, clientY: i }));
+      window.dispatchEvent(
+        new MouseEvent('mousemove', { bubbles: true, clientX: i, clientY: i })
+      );
     });
   }
   act(() => {
-    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    window.dispatchEvent(
+      new MouseEvent('mouseup', { bubbles: true, button: 0 })
+    );
   });
 }
 
@@ -103,9 +119,9 @@ describe('Configuration (component/integration)', () => {
     });
 
     const status = screen.getByRole('status');
-    const [visitedText, pathLengthText, timeText] = Array.from(status.querySelectorAll('.font-bold')).map(
-      (el) => el.textContent
-    );
+    const [visitedText, pathLengthText, timeText] = Array.from(
+      status.querySelectorAll('.font-bold')
+    ).map(el => el.textContent);
     expect(Number(visitedText)).toBeGreaterThan(0);
     expect(Number(pathLengthText)).toBeGreaterThan(0);
     expect(timeText).toMatch(/ms$/);
@@ -179,7 +195,12 @@ describe('Configuration (component/integration)', () => {
   it('click-and-drag paints multiple cells from one gesture', () => {
     render(<Configuration />);
 
-    const cells = [getCellById(5, 5), getCellById(5, 6), getCellById(5, 7), getCellById(5, 8)];
+    const cells = [
+      getCellById(5, 5),
+      getCellById(5, 6),
+      getCellById(5, 7),
+      getCellById(5, 8),
+    ];
     dragThroughCells(cells);
 
     for (const cell of cells) {
@@ -213,10 +234,13 @@ describe('Configuration (component/integration)', () => {
     // visual `kind` and search still uses the stale old start position, the
     // resulting path length would not be exactly 1.
     const adjacentToGoal = getCellById(goalRow + 1, goalColumn);
-    expect(adjacentToGoal.className.split(' ')).not.toContain('board-cell-anchor');
+    expect(adjacentToGoal.className.split(' ')).not.toContain(
+      'board-cell-anchor'
+    );
 
     const startCellBefore = findAnchorCell('S');
-    const { row: oldStartRow, column: oldStartColumn } = rowColOf(startCellBefore);
+    const { row: oldStartRow, column: oldStartColumn } =
+      rowColOf(startCellBefore);
 
     dragCell(startCellBefore, adjacentToGoal);
 
@@ -246,7 +270,9 @@ describe('Configuration (component/integration)', () => {
     const startCell = findAnchorCell('S');
     const { row: startRow, column: startColumn } = rowColOf(startCell);
     const adjacentToStart = getCellById(startRow - 1, startColumn);
-    expect(adjacentToStart.className.split(' ')).not.toContain('board-cell-anchor');
+    expect(adjacentToStart.className.split(' ')).not.toContain(
+      'board-cell-anchor'
+    );
 
     const goalCellBefore = findAnchorCell('G');
     const { row: oldGoalRow, column: oldGoalColumn } = rowColOf(goalCellBefore);
@@ -347,9 +373,14 @@ describe('Configuration (component/integration)', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape', code: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('dialog'), {
+      key: 'Escape',
+      code: 'Escape',
+    });
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
   });
 
   it('shows an error when the goal is sealed off, and clears it on reset', () => {
@@ -360,7 +391,12 @@ describe('Configuration (component/integration)', () => {
     const { row, column } = rowColOf(goalCell);
     // Wall in every cardinal neighbor of goal (all exist - goal is placed
     // one cell inside the border, never at row 0).
-    const neighbors = [getCellById(row - 1, column), getCellById(row + 1, column), getCellById(row, column - 1), getCellById(row, column + 1)];
+    const neighbors = [
+      getCellById(row - 1, column),
+      getCellById(row + 1, column),
+      getCellById(row, column - 1),
+      getCellById(row, column + 1),
+    ];
     for (const neighbor of neighbors) {
       fireEvent.mouseDown(neighbor, { button: 0 });
       fireEvent.mouseUp(window, { button: 0 });

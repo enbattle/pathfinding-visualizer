@@ -85,7 +85,10 @@ class PriorityItem<T> {
 abstract class PriorityQueueHeap<T> {
   private heap: PriorityItem<T>[] = [];
 
-  protected abstract comesBefore(a: PriorityItem<T>, b: PriorityItem<T>): boolean;
+  protected abstract comesBefore(
+    a: PriorityItem<T>,
+    b: PriorityItem<T>
+  ): boolean;
 
   // Push item into the priority queue
   push(item: T, priority: number): void {
@@ -141,8 +144,10 @@ abstract class PriorityQueueHeap<T> {
       const right = 2 * i + 2;
       let best = i;
 
-      if (left < n && this.comesBefore(this.heap[left], this.heap[best])) best = left;
-      if (right < n && this.comesBefore(this.heap[right], this.heap[best])) best = right;
+      if (left < n && this.comesBefore(this.heap[left], this.heap[best]))
+        best = left;
+      if (right < n && this.comesBefore(this.heap[right], this.heap[best]))
+        best = right;
       if (best === i) break;
 
       [this.heap[i], this.heap[best]] = [this.heap[best], this.heap[i]];

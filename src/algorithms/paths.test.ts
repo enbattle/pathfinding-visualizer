@@ -26,7 +26,11 @@ function coord(row: number, column: number): CoordinateAndDirection {
 
 // A path's returned shape is [start, ...intermediate cells..., goal] with
 // each consecutive pair differing by exactly one cell in one direction.
-function assertValidPath(path: CoordinateAndDirection[] | null, start: CoordinateAndDirection, goal: CoordinateAndDirection) {
+function assertValidPath(
+  path: CoordinateAndDirection[] | null,
+  start: CoordinateAndDirection,
+  goal: CoordinateAndDirection
+) {
   expect(path).not.toBeNull();
   const p = path as CoordinateAndDirection[];
   expect(p[0]).toMatchObject({ row: start.row, column: start.column });
@@ -49,31 +53,79 @@ describe('pathfinding algorithms on an open grid', () => {
 
   it('Breadth-first Search finds a valid path', () => {
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = unweightedSearch(rows, columns, start, goal, noWalls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+    const path = unweightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      'BreadthFirstSearch',
+      scheduleTimeout,
+      animationCallbacks
+    );
     assertValidPath(path, start, goal);
   });
 
   it('Depth-first Search finds a valid (if not necessarily shortest) path', () => {
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = unweightedSearch(rows, columns, start, goal, noWalls, 'DepthFirstSearch', scheduleTimeout, animationCallbacks);
+    const path = unweightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      'DepthFirstSearch',
+      scheduleTimeout,
+      animationCallbacks
+    );
     assertValidPath(path, start, goal);
   });
 
   it("Dijkstra's Algorithm finds a valid path", () => {
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = weightedSearch(rows, columns, start, goal, noWalls, noWeights, 'DijkstrasAlgorithm', scheduleTimeout, animationCallbacks);
+    const path = weightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      noWeights,
+      'DijkstrasAlgorithm',
+      scheduleTimeout,
+      animationCallbacks
+    );
     assertValidPath(path, start, goal);
   });
 
   it('A* Algorithm finds a valid path', () => {
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = weightedSearch(rows, columns, start, goal, noWalls, noWeights, 'AStarAlgorithm', scheduleTimeout, animationCallbacks);
+    const path = weightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      noWeights,
+      'AStarAlgorithm',
+      scheduleTimeout,
+      animationCallbacks
+    );
     assertValidPath(path, start, goal);
   });
 
   it('Greedy Best-first Search finds a valid path', () => {
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = weightedSearch(rows, columns, start, goal, noWalls, noWeights, 'GreedyBestFirstSearch', scheduleTimeout, animationCallbacks);
+    const path = weightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      noWeights,
+      'GreedyBestFirstSearch',
+      scheduleTimeout,
+      animationCallbacks
+    );
     assertValidPath(path, start, goal);
   });
 
@@ -85,9 +137,38 @@ describe('pathfinding algorithms on an open grid', () => {
     const dijkstraHarness = createAnimationHarness();
     const aStarHarness = createAnimationHarness();
 
-    const bfs = unweightedSearch(rows, columns, start, goal, noWalls, 'BreadthFirstSearch', bfsHarness.scheduleTimeout, bfsHarness.animationCallbacks);
-    const dijkstra = weightedSearch(rows, columns, start, goal, noWalls, noWeights, 'DijkstrasAlgorithm', dijkstraHarness.scheduleTimeout, dijkstraHarness.animationCallbacks);
-    const aStar = weightedSearch(rows, columns, start, goal, noWalls, noWeights, 'AStarAlgorithm', aStarHarness.scheduleTimeout, aStarHarness.animationCallbacks);
+    const bfs = unweightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      'BreadthFirstSearch',
+      bfsHarness.scheduleTimeout,
+      bfsHarness.animationCallbacks
+    );
+    const dijkstra = weightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      noWeights,
+      'DijkstrasAlgorithm',
+      dijkstraHarness.scheduleTimeout,
+      dijkstraHarness.animationCallbacks
+    );
+    const aStar = weightedSearch(
+      rows,
+      columns,
+      start,
+      goal,
+      noWalls,
+      noWeights,
+      'AStarAlgorithm',
+      aStarHarness.scheduleTimeout,
+      aStarHarness.animationCallbacks
+    );
 
     expect(bfs).not.toBeNull();
     expect(dijkstra).not.toBeNull();
@@ -112,9 +193,38 @@ describe('pathfinding algorithms on an open grid', () => {
     const dijkstraHarness = createAnimationHarness();
     const aStarHarness = createAnimationHarness();
 
-    const bfs = unweightedSearch(rows, columns, rowStart, rowGoal, noWalls, 'BreadthFirstSearch', bfsHarness.scheduleTimeout, bfsHarness.animationCallbacks);
-    const dijkstra = weightedSearch(rows, columns, rowStart, rowGoal, noWalls, weights, 'DijkstrasAlgorithm', dijkstraHarness.scheduleTimeout, dijkstraHarness.animationCallbacks);
-    const aStar = weightedSearch(rows, columns, rowStart, rowGoal, noWalls, weights, 'AStarAlgorithm', aStarHarness.scheduleTimeout, aStarHarness.animationCallbacks);
+    const bfs = unweightedSearch(
+      rows,
+      columns,
+      rowStart,
+      rowGoal,
+      noWalls,
+      'BreadthFirstSearch',
+      bfsHarness.scheduleTimeout,
+      bfsHarness.animationCallbacks
+    );
+    const dijkstra = weightedSearch(
+      rows,
+      columns,
+      rowStart,
+      rowGoal,
+      noWalls,
+      weights,
+      'DijkstrasAlgorithm',
+      dijkstraHarness.scheduleTimeout,
+      dijkstraHarness.animationCallbacks
+    );
+    const aStar = weightedSearch(
+      rows,
+      columns,
+      rowStart,
+      rowGoal,
+      noWalls,
+      weights,
+      'AStarAlgorithm',
+      aStarHarness.scheduleTimeout,
+      aStarHarness.animationCallbacks
+    );
 
     assertValidPath(bfs, rowStart, rowGoal);
     assertValidPath(dijkstra, rowStart, rowGoal);
@@ -128,11 +238,17 @@ describe('pathfinding algorithms on an open grid', () => {
     // at most the two unavoidable weighted endpoints-adjacent cells (not
     // the 8 interior weighted cells BFS walks straight through).
     const weightedCellsOnPath = (path: CoordinateAndDirection[] | null) =>
-      (path as CoordinateAndDirection[]).filter((p) => weights.has(`${p.row}_${p.column}`)).length;
+      (path as CoordinateAndDirection[]).filter(p =>
+        weights.has(`${p.row}_${p.column}`)
+      ).length;
 
-    expect(weightedCellsOnPath(dijkstra)).toBeLessThan(weightedCellsOnPath(bfs));
+    expect(weightedCellsOnPath(dijkstra)).toBeLessThan(
+      weightedCellsOnPath(bfs)
+    );
     expect(weightedCellsOnPath(aStar)).toBeLessThan(weightedCellsOnPath(bfs));
-    expect((dijkstra as CoordinateAndDirection[]).length).toBeGreaterThan((bfs as CoordinateAndDirection[]).length);
+    expect((dijkstra as CoordinateAndDirection[]).length).toBeGreaterThan(
+      (bfs as CoordinateAndDirection[]).length
+    );
   });
 
   it('returns null when the goal is completely walled off', () => {
@@ -145,7 +261,16 @@ describe('pathfinding algorithms on an open grid', () => {
     walls.add('5_6');
 
     const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-    const path = unweightedSearch(rows, columns, start, sealedGoal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+    const path = unweightedSearch(
+      rows,
+      columns,
+      start,
+      sealedGoal,
+      walls,
+      'BreadthFirstSearch',
+      scheduleTimeout,
+      animationCallbacks
+    );
     expect(path).toBeNull();
   });
 });

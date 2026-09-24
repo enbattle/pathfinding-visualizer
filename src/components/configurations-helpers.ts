@@ -11,9 +11,18 @@ export const CELL_SIZE_PX = 28;
 // raw window (first-paint guess, before anything has actually laid out) or
 // to a measured container's real content-box size (see
 // computeBoardSize below and its caller in configurations.tsx).
-export function computeBoardSizeFromDimensions(widthPx: number, heightPx: number): { rows: number; columns: number } {
-  const rows = Math.floor(heightPx / CELL_SIZE_PX) >= 20 ? Math.floor(heightPx / CELL_SIZE_PX) : 20;
-  const columns = Math.floor(widthPx / CELL_SIZE_PX) >= 20 ? Math.floor(widthPx / CELL_SIZE_PX) : 20;
+export function computeBoardSizeFromDimensions(
+  widthPx: number,
+  heightPx: number
+): { rows: number; columns: number } {
+  const rows =
+    Math.floor(heightPx / CELL_SIZE_PX) >= 20
+      ? Math.floor(heightPx / CELL_SIZE_PX)
+      : 20;
+  const columns =
+    Math.floor(widthPx / CELL_SIZE_PX) >= 20
+      ? Math.floor(widthPx / CELL_SIZE_PX)
+      : 20;
   return { rows, columns };
 }
 
@@ -33,19 +42,25 @@ export function computeBoardSize(): { rows: number; columns: number } {
 // than on it - a border cell only has 2-3 real neighbors instead of 4, which
 // lets the maze wall it in completely even though recursiveDivision's
 // exclusion-zone logic guarantees connectivity for the interior region.
-export function randomStartCoordinate(rows: number, columns: number): CoordinateAndDirection {
+export function randomStartCoordinate(
+  rows: number,
+  columns: number
+): CoordinateAndDirection {
   return {
     row: rows - 2,
     column: randIntBetween(1, Math.floor(columns / 2)),
-    direction: ''
+    direction: '',
   };
 }
 
-export function randomGoalCoordinate(rows: number, columns: number): CoordinateAndDirection {
+export function randomGoalCoordinate(
+  rows: number,
+  columns: number
+): CoordinateAndDirection {
   return {
     row: 1,
     column: randIntBetween(Math.floor(columns / 2), columns - 2),
-    direction: ''
+    direction: '',
   };
 }
 

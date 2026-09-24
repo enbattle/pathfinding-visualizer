@@ -19,12 +19,15 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
       // CRA's prior config (eslint-config-react-app) never flagged `any` —
       // keep it visible but non-blocking rather than requiring speculative
       // type design on existing generic queue/graph code as part of a
       // build-tool migration.
       '@typescript-eslint/no-explicit-any': 'warn',
     },
-  },
+  }
 );

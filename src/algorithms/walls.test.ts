@@ -35,7 +35,9 @@ const scheduleWallPlacement = (callback: () => void, delay: number): void => {
   setTimeout(callback, delay);
 };
 
-function collectWalls(build: (buildWall: (row: number, column: number) => void) => void): Set<string> {
+function collectWalls(
+  build: (buildWall: (row: number, column: number) => void) => void
+): Set<string> {
   vi.useFakeTimers();
   const walls = new Set<string>();
   build((row, column) => walls.add(`${row}_${column}`));
@@ -62,12 +64,33 @@ describe('recursive division maze generation', () => {
   it.each(Array.from({ length: TRIALS }, (_, i) => i))(
     'recursiveDivision (single-thickness) leaves start and goal reachable (trial %i)',
     () => {
-      const walls = collectWalls((buildWall) =>
-        recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+      const walls = collectWalls(buildWall =>
+        recursiveDivision(
+          0,
+          start,
+          goal,
+          rows,
+          columns,
+          1,
+          1,
+          rows - 2,
+          columns - 2,
+          buildWall,
+          scheduleWallPlacement
+        )
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-      const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+      const path = unweightedSearch(
+        rows,
+        columns,
+        start,
+        goal,
+        walls,
+        'BreadthFirstSearch',
+        scheduleTimeout,
+        animationCallbacks
+      );
 
       expect(path).not.toBeNull();
     }
@@ -76,47 +99,113 @@ describe('recursive division maze generation', () => {
   it.each(Array.from({ length: TRIALS }, (_, i) => i))(
     'recursiveDivisionTwoLayers (double-thickness) leaves start and goal reachable (trial %i)',
     () => {
-      const walls = collectWalls((buildWall) =>
-        recursiveDivisionTwoLayers(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+      const walls = collectWalls(buildWall =>
+        recursiveDivisionTwoLayers(
+          0,
+          start,
+          goal,
+          rows,
+          columns,
+          1,
+          1,
+          rows - 2,
+          columns - 2,
+          buildWall,
+          scheduleWallPlacement
+        )
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-      const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+      const path = unweightedSearch(
+        rows,
+        columns,
+        start,
+        goal,
+        walls,
+        'BreadthFirstSearch',
+        scheduleTimeout,
+        animationCallbacks
+      );
 
       expect(path).not.toBeNull();
     }
   );
 
   it.each(Array.from({ length: TRIALS }, (_, i) => i))(
-    "prims leaves start and goal reachable (trial %i)",
+    'prims leaves start and goal reachable (trial %i)',
     () => {
-      const walls = collectWalls((buildWall) =>
-        prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+      const walls = collectWalls(buildWall =>
+        prims(
+          0,
+          start,
+          goal,
+          rows,
+          columns,
+          1,
+          1,
+          rows - 2,
+          columns - 2,
+          buildWall,
+          scheduleWallPlacement
+        )
       );
 
       const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-      const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+      const path = unweightedSearch(
+        rows,
+        columns,
+        start,
+        goal,
+        walls,
+        'BreadthFirstSearch',
+        scheduleTimeout,
+        animationCallbacks
+      );
 
       expect(path).not.toBeNull();
     }
   );
 
-  it("prims never places a wall directly on the start or goal cell", () => {
-    const walls = collectWalls((buildWall) =>
-      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+  it('prims never places a wall directly on the start or goal cell', () => {
+    const walls = collectWalls(buildWall =>
+      prims(
+        0,
+        start,
+        goal,
+        rows,
+        columns,
+        1,
+        1,
+        rows - 2,
+        columns - 2,
+        buildWall,
+        scheduleWallPlacement
+      )
     );
 
     expect(walls.has(`${start.row}_${start.column}`)).toBe(false);
     expect(walls.has(`${goal.row}_${goal.column}`)).toBe(false);
   });
 
-  it("prims produces a structurally different wall count than recursive division (organic vs. blocky)", () => {
+  it('prims produces a structurally different wall count than recursive division (organic vs. blocky)', () => {
     // Not a rigorous "shape" check, but a cheap structural sanity check
     // that Prim's isn't secretly degenerating into the same partition
     // pattern (or into an all-open / all-walled board).
     vi.spyOn(Math, 'random').mockReturnValue(0.37);
-    const primsWalls = collectWalls((buildWall) =>
-      prims(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+    const primsWalls = collectWalls(buildWall =>
+      prims(
+        0,
+        start,
+        goal,
+        rows,
+        columns,
+        1,
+        1,
+        rows - 2,
+        columns - 2,
+        buildWall,
+        scheduleWallPlacement
+      )
     );
     vi.restoreAllMocks();
 
@@ -130,8 +219,20 @@ describe('recursive division maze generation', () => {
     // exclusion-zone logic's own bookkeeping, not connectivity, so it
     // doesn't need repeated-trial coverage the way reachability does.
     vi.spyOn(Math, 'random').mockReturnValue(0.42);
-    const walls = collectWalls((buildWall) =>
-      recursiveDivision(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+    const walls = collectWalls(buildWall =>
+      recursiveDivision(
+        0,
+        start,
+        goal,
+        rows,
+        columns,
+        1,
+        1,
+        rows - 2,
+        columns - 2,
+        buildWall,
+        scheduleWallPlacement
+      )
     );
     vi.restoreAllMocks();
 
@@ -153,7 +254,11 @@ describe('recursive division maze generation - start/goal placed anywhere (e.g. 
     ['recursiveDivisionTwoLayers', recursiveDivisionTwoLayers],
   ];
 
-  const SIZES: [number, number][] = [[21, 21], [30, 45], [45, 30]];
+  const SIZES: [number, number][] = [
+    [21, 21],
+    [30, 45],
+    [45, 30],
+  ];
 
   const TRIALS = 25;
 
@@ -162,18 +267,49 @@ describe('recursive division maze generation - start/goal placed anywhere (e.g. 
       it.each(Array.from({ length: TRIALS }, (_, i) => i))(
         `${name} on a ${rows}x${columns} board leaves a randomly-placed start/goal reachable (trial %i)`,
         () => {
-          const start = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
-          let goal = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
+          const start = coord(
+            randIntBetween(1, rows - 2),
+            randIntBetween(1, columns - 2)
+          );
+          let goal = coord(
+            randIntBetween(1, rows - 2),
+            randIntBetween(1, columns - 2)
+          );
           while (goal.row === start.row && goal.column === start.column) {
-            goal = coord(randIntBetween(1, rows - 2), randIntBetween(1, columns - 2));
+            goal = coord(
+              randIntBetween(1, rows - 2),
+              randIntBetween(1, columns - 2)
+            );
           }
 
-          const walls = collectWalls((buildWall) =>
-            algorithm(0, start, goal, rows, columns, 1, 1, rows - 2, columns - 2, buildWall, scheduleWallPlacement)
+          const walls = collectWalls(buildWall =>
+            algorithm(
+              0,
+              start,
+              goal,
+              rows,
+              columns,
+              1,
+              1,
+              rows - 2,
+              columns - 2,
+              buildWall,
+              scheduleWallPlacement
+            )
           );
 
-          const { scheduleTimeout, animationCallbacks } = createAnimationHarness();
-          const path = unweightedSearch(rows, columns, start, goal, walls, 'BreadthFirstSearch', scheduleTimeout, animationCallbacks);
+          const { scheduleTimeout, animationCallbacks } =
+            createAnimationHarness();
+          const path = unweightedSearch(
+            rows,
+            columns,
+            start,
+            goal,
+            walls,
+            'BreadthFirstSearch',
+            scheduleTimeout,
+            animationCallbacks
+          );
 
           expect(path).not.toBeNull();
         }

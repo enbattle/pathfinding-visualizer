@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 :root {
   /* Board/algorithm colors - functional, referenced by the legend and by
@@ -67,17 +67,20 @@
 body {
   margin: 0;
   font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
   background-color: var(--background);
   background-image:
-    radial-gradient(circle at 12% 8%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 45%),
-    radial-gradient(circle at 88% 92%, color-mix(in oklch, var(--primary) 9%, transparent), transparent 50%);
+    radial-gradient(
+      circle at 12% 8%,
+      color-mix(in oklch, var(--primary) 14%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 88% 92%,
+      color-mix(in oklch, var(--primary) 9%, transparent),
+      transparent 50%
+    );
   background-attachment: fixed;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
@@ -86,12 +89,7 @@ body {
 
 code {
   font-family:
-    source-code-pro,
-    Menlo,
-    Monaco,
-    Consolas,
-    'Courier New',
-    monospace;
+    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 /*
@@ -209,13 +207,35 @@ code {
       var(--goal-path-final-color) 66.6%,
       var(--goal-path-final-color) 100%
     ),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    );
 }
 
 .left-to-up-path {
   background:
-    linear-gradient(90deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
+    linear-gradient(
+      90deg,
+      var(--goal-path-final-color) 0%,
+      var(--goal-path-final-color) 33.3%,
+      transparent 33.3%,
+      transparent 100%
+    ),
     linear-gradient(
       180deg,
       transparent 0%,
@@ -223,8 +243,24 @@ code {
       var(--goal-path-final-color) 66.6%,
       var(--goal-path-final-color) 100%
     ),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    );
 }
 
 .right-to-down-path {
@@ -236,17 +272,67 @@ code {
       var(--goal-path-final-color) 66.6%,
       var(--goal-path-final-color) 100%
     ),
-    linear-gradient(180deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+    linear-gradient(
+      180deg,
+      var(--goal-path-final-color) 0%,
+      var(--goal-path-final-color) 33.3%,
+      transparent 33.3%,
+      transparent 100%
+    ),
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    );
 }
 
 .left-to-down-path {
   background:
-    linear-gradient(90deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(180deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
+    linear-gradient(
+      90deg,
+      var(--goal-path-final-color) 0%,
+      var(--goal-path-final-color) 33.3%,
+      transparent 33.3%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--goal-path-final-color) 0%,
+      var(--goal-path-final-color) 33.3%,
+      transparent 33.3%,
+      transparent 100%
+    ),
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 33.3%,
+      black 33.3%,
+      black 66.6%,
+      transparent 66.6%,
+      transparent 100%
+    );
 }
 
 @keyframes boardfill {

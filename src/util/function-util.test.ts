@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { randIntBetween, evenRandIntBetween, oddRandIntBetween, getEuclideanDistance } from './function-util';
+import {
+  randIntBetween,
+  evenRandIntBetween,
+  oddRandIntBetween,
+  getEuclideanDistance,
+} from './function-util';
 
 describe('randIntBetween', () => {
   it('stays within [min, max] inclusive across many trials', () => {
@@ -80,6 +85,9 @@ describe('getEuclideanDistance', () => {
 
   it('matches true Euclidean distance for a non-integer-hypotenuse offset', () => {
     // (row diff 1, column diff 1) -> sqrt(2), not 2.
-    expect(getEuclideanDistance(coord(0, 0), coord(1, 1))).toBeCloseTo(Math.SQRT2, 10);
+    expect(getEuclideanDistance(coord(0, 0), coord(1, 1))).toBeCloseTo(
+      Math.SQRT2,
+      10
+    );
   });
 });
