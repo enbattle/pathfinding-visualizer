@@ -368,15 +368,13 @@ const Board = ({
     };
     onStats(statsRef.current);
 
+    const problem = {
+      grid: snapshotGrid(),
+      start: indexOf(currentStart),
+      goal: indexOf(currentGoal),
+    };
     const startTime = performance.now();
-    const { events, result } = runSearch(
-      {
-        grid: snapshotGrid(),
-        start: indexOf(currentStart),
-        goal: indexOf(currentGoal),
-      },
-      pathAlgorithm
-    );
+    const { events, result } = runSearch(problem, pathAlgorithm);
     const algorithmTimeMs = performance.now() - startTime;
 
     let delay = stepDelay;
