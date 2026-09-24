@@ -23,12 +23,24 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop',
-      testIgnore: /mobile\.spec\.ts/,
+      testIgnore: /(mobile|assets)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
         // Headless Chromium has no GPU; SwiftShader gives it a software
         // WebGL implementation so the 3D view can really run.
+        launchOptions: {
+          args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+        },
+      },
+    },
+    {
+      // Generates the README screenshots, link preview and icons: run on
+      // demand with `npm run assets`, never as part of the test suite.
+      name: 'assets',
+      testMatch: /assets\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
         launchOptions: {
           args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
         },
@@ -43,7 +55,9 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
     url: BASE_URL,
-    reuseExistingServer: !CI,
+    // Always build fresh: reusing a server left running could test a stale
+    // build and pass for the wrong reason.
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

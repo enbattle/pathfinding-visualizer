@@ -2,6 +2,7 @@ import React from 'react';
 import {
   BrickWallIcon,
   CheckIcon,
+  CodeXmlIcon,
   InfoIcon,
   LinkIcon,
   RouteIcon,
@@ -251,6 +252,17 @@ const Workspace = ({
             onClick={share}
           >
             {shareStatus === 'copied' ? <CheckIcon /> : <LinkIcon />} Share
+          </Button>
+          <Button asChild variant="ghost" size="icon-sm">
+            <a
+              href="https://github.com/enbattle/pathfinding-visualizer"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Source code on GitHub"
+              title="Source code on GitHub"
+            >
+              <CodeXmlIcon />
+            </a>
           </Button>
           <Button
             type="button"

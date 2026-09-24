@@ -51,9 +51,13 @@ updates:
             '@types/node',
           ]
     ignore:
-      # typescript-eslint supports TypeScript <6.1 so far; take TS 7 once it does.
+      # typescript-eslint currently requires TypeScript <6.1 (its peer range); lift this when a
+      # typescript-eslint release widens it.
       - dependency-name: typescript
-        versions: ['>=7']
+        versions: ['>=6.1']
+      # Node's types track the runtime CI uses (.nvmrc: 22); bump both together, by hand.
+      - dependency-name: '@types/node'
+        versions: ['>=23']
 
   # Keeps the SHA-pinned actions in .github/workflows current.
   - package-ecosystem: github-actions

@@ -1,15 +1,19 @@
 name: Deploy
 
 on:
-  push:
+  # Deploys only after CI passes on main (verify, e2e and bench all green), so nothing ships that
+  # CI rejected. workflow_run always runs this file from the default branch.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   # Lets the deploy be re-run manually from the Actions tab without a new commit.
   workflow_dispatch:
 
+# Least privilege by default; only the deploy job below gets Pages/OIDC access, so the build job
+# (which runs third-party install scripts via npm ci) can never mint a deployment token.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Only one deploy should ever be in flight; a second push should wait for the
 # first to finish rather than race it, so this isn't cancel-in-progress.
@@ -20,22 +24,26 @@ concurrency:
 # Actions are pinned to full commit SHAs; the comment records the version.
 jobs:
   build:
+    # For workflow_run: only a successful CI run for a push to main (never a PR's run).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Exactly the commit CI tested (for manual runs, the selected ref).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       # No dependency cache for the artifact that gets published: a clean install from the lockfile
       # can't be affected by a poisoned cache entry.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           package-manager-cache: false
       - run: npm ci
-      # Re-checked here so a broken commit can't ship even if CI was skipped or is still running.
-      - run: npm run typecheck
-      - run: npm run test:run
       - run: npm run build
       - run: npm run check:bundle
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -47,6 +55,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

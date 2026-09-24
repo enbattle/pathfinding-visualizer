@@ -39,6 +39,12 @@ export default tseslint.config(
     },
   },
   {
+    // Plain JavaScript (build scripts, this config): Node scripts.
+    files: ['**/*.{js,mjs}'],
+    extends: [js.configs.recommended],
+    languageOptions: { ecmaVersion: 2022, globals: globals.node },
+  },
+  {
     // Playwright tests and config run in Node, not the browser.
     files: ['e2e/**/*.ts', 'playwright.config.ts'],
     languageOptions: { globals: globals.node },
