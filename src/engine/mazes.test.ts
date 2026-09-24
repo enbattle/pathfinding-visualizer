@@ -1,16 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import {
-  drawBorderWalls,
-  prims as oldPrims,
-  recursiveDivision as oldRecursiveDivision,
-  recursiveDivisionTwoLayers as oldRecursiveDivisionTwoLayers,
-} from '../algorithms/walls';
-import type { CoordinateAndDirection } from '../models/models';
 import {
   generateMaze,
   MAZE_ALGORITHMS,
-  type MazeAlgorithmId,
   type MazeProblem,
   type WallPlacement,
 } from './mazes';
@@ -18,144 +10,55 @@ import { seededRandom } from './random';
 
 const ALGORITHM_IDS = MAZE_ALGORITHMS.map(({ id }) => id);
 
-const OLD_INTERIOR = {
-  'recursive-division': oldRecursiveDivision,
-  'recursive-division-thick': oldRecursiveDivisionTwoLayers,
-  prims: oldPrims,
-} satisfies Record<MazeAlgorithmId, unknown>;
+// '#' wall, 'S' start, 'G' goal, '.' open.
+function render(problem: MazeProblem, placements: WallPlacement[]): string {
+  const walls = new Set(placements.map(({ index }) => index));
+  const lines: string[] = [];
+  for (let row = 0; row < problem.rows; row++) {
+    let line = '';
+    for (let column = 0; column < problem.columns; column++) {
+      const index = row * problem.columns + column;
+      if (index === problem.start) line += 'S';
+      else if (index === problem.goal) line += 'G';
+      else line += walls.has(index) ? '#' : '.';
+    }
+    lines.push(line);
+  }
+  return `\n${lines.join('\n')}\n`;
+}
 
-// Runs the old timer-driven implementation exactly the way board.tsx's
-// addRecursiveWalls does (border + interior, both from delay 0), with
-// stepDelay 1 so each scheduled delay *is* the tick, and reduces the
-// recorded placements to index -> earliest tick (the board ignored
-// re-walling an already-walled cell).
-function runOld(
-  problem: MazeProblem,
-  algorithm: MazeAlgorithmId,
-  seed: number
-): Map<number, number> {
-  const { rows, columns } = problem;
-  const toCoord = (index: number): CoordinateAndDirection => ({
-    row: Math.floor(index / columns),
-    column: index % columns,
-    direction: '',
+// Locks in each algorithm's exact output for a fixed seed, so any change to
+// how mazes are generated shows up as a readable diff in review. (Output
+// was proven identical to the pre-engine implementation before that code
+// was removed - see the git history of src/algorithms/walls.tsx.) Only
+// regenerate (vitest -u) for an intentional change.
+describe('generateMaze snapshots (seed 42, 13x25, app-style start/goal)', () => {
+  const problem: MazeProblem = {
+    rows: 13,
+    columns: 25,
+    start: 11 * 25 + 4,
+    goal: 1 * 25 + 19,
+  };
+
+  it.each(ALGORITHM_IDS)('%s', algorithm => {
+    expect(
+      render(problem, generateMaze(problem, algorithm, seededRandom(42)))
+    ).toMatchSnapshot();
   });
-  const start = toCoord(problem.start);
-  const goal = toCoord(problem.goal);
-  const earliest = new Map<number, number>();
-  let pendingDelay = 0;
-  const scheduleTimeout = (callback: () => void, delay: number): void => {
-    pendingDelay = delay;
-    callback();
-  };
-  const buildWall = (row: number, column: number): void => {
-    const index = row * columns + column;
-    const existing = earliest.get(index);
-    if (existing === undefined || pendingDelay < existing) {
-      earliest.set(index, pendingDelay);
-    }
-  };
 
-  const spy = vi.spyOn(Math, 'random').mockImplementation(seededRandom(seed));
-  try {
-    drawBorderWalls(start, goal, rows, columns, buildWall, scheduleTimeout, 1);
-    OLD_INTERIOR[algorithm](
-      0,
-      start,
-      goal,
-      rows,
-      columns,
-      1,
-      1,
-      rows - 2,
-      columns - 2,
-      buildWall,
-      scheduleTimeout,
-      1
-    );
-  } finally {
-    spy.mockRestore();
-  }
-  return earliest;
-}
-
-function toTickMap(placements: WallPlacement[]): Map<number, number> {
-  return new Map(placements.map(({ index, tick }) => [index, tick]));
-}
-
-// The app's own placement pattern (configurations-helpers.ts): start one
-// row above the bottom border in the left half, goal one row below the top
-// border in the right half.
-function appPlacement(
-  rows: number,
-  columns: number,
-  seed: number
-): MazeProblem {
-  const random = seededRandom(seed ^ 0x9e3779b9);
-  const between = (min: number, max: number) =>
-    Math.floor(random() * (max - min + 1) + min);
-  const startColumn = between(1, Math.floor(columns / 2));
-  const goalColumn = between(Math.floor(columns / 2), columns - 2);
-  return {
-    rows,
-    columns,
-    start: (rows - 2) * columns + startColumn,
-    goal: 1 * columns + goalColumn,
-  };
-}
-
-// Anywhere strictly inside the border (e.g. after dragging), start !== goal.
-function interiorPlacement(
-  rows: number,
-  columns: number,
-  seed: number
-): MazeProblem {
-  const random = seededRandom(seed ^ 0x85ebca6b);
-  const pick = () =>
-    (1 + Math.floor(random() * (rows - 2))) * columns +
-    (1 + Math.floor(random() * (columns - 2)));
-  const start = pick();
-  let goal = pick();
-  while (goal === start) goal = pick();
-  return { rows, columns, start, goal };
-}
-
-const SIZES: [number, number][] = [
-  [20, 20],
-  [21, 21],
-  [26, 53],
-  [30, 45],
-  [45, 30],
-  [5, 7],
-  [7, 5],
-  [6, 6],
-];
-const SEEDS = Array.from({ length: 15 }, (_, i) => i * 7919 + 1);
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-describe('generateMaze matches the old timer-driven implementation exactly', () => {
-  for (const algorithm of ALGORITHM_IDS) {
-    for (const [rows, columns] of SIZES) {
-      it(`${algorithm} on ${rows}x${columns} (app and dragged placements, ${SEEDS.length} seeds each)`, () => {
-        for (const seed of SEEDS) {
-          for (const problem of [
-            appPlacement(rows, columns, seed),
-            interiorPlacement(rows, columns, seed),
-          ]) {
-            const expected = runOld(problem, algorithm, seed);
-            expect(expected.size).toBeGreaterThan(0);
-            const actual = toTickMap(
-              generateMaze(problem, algorithm, seededRandom(seed))
-            );
-            expect(actual).toEqual(expected);
-          }
-        }
-      });
-    }
-  }
+  it('animates the border and the interior in parallel from tick 0', () => {
+    const atTickZero = generateMaze(
+      problem,
+      'recursive-division',
+      seededRandom(42)
+    )
+      .filter(({ tick }) => tick === 0)
+      .map(({ index }) => index);
+    const isBorder = (index: number) =>
+      index < 25 || index % 25 === 0 || index % 25 === 24 || index >= 12 * 25;
+    expect(atTickZero.some(isBorder)).toBe(true);
+    expect(atTickZero.some(index => !isBorder(index))).toBe(true);
+  });
 });
 
 // Start/goal strictly inside the border, start !== goal, plus a seed.
@@ -251,6 +154,10 @@ describe('generateMaze properties (random sizes, seeds and placements)', () => {
     );
   });
 
+  // Also the regression test for start/goal dragged onto a row/column a
+  // dividing wall runs straight through (see isEmbeddedInWall in mazes.ts):
+  // start/goal can be anywhere in the interior here, not just where the
+  // app first places them.
   it('always leaves start and goal connected', () => {
     fc.assert(
       fc.property(mazeCaseArbitrary, ({ problem, seed, algorithm }) => {

@@ -8,7 +8,7 @@ import {
   type MazeAlgorithmId,
   type PathAlgorithmId,
 } from '../engine';
-import type { CoordinateAndDirection } from '../models/models';
+import type { Coordinate } from './configurations-helpers';
 import { pathSegmentClasses } from './path-segments';
 import { cn } from '@/lib/utils';
 
@@ -21,8 +21,8 @@ export interface RunStats {
 interface IBoardParameters {
   rows: number;
   columns: number;
-  startCoordinate: CoordinateAndDirection;
-  goalCoordinate: CoordinateAndDirection;
+  startCoordinate: Coordinate;
+  goalCoordinate: Coordinate;
   pathAlgorithm: PathAlgorithmId;
   wallAlgorithm: MazeAlgorithmId;
   paintMode: 'wall' | 'weight';
@@ -61,8 +61,8 @@ interface CellState {
 function buildInitialCells(
   rows: number,
   columns: number,
-  startCoordinate: CoordinateAndDirection,
-  goalCoordinate: CoordinateAndDirection
+  startCoordinate: Coordinate,
+  goalCoordinate: Coordinate
 ): CellState[][] {
   const cells: CellState[][] = [];
   for (let i = 0; i < rows; i++) {
@@ -169,9 +169,9 @@ const Board = ({
   // through the parent - props only matter again at the next full reset,
   // where resetBoard() below re-seeds from them.
   const [currentStart, setCurrentStart] =
-    React.useState<CoordinateAndDirection>(startCoordinate);
+    React.useState<Coordinate>(startCoordinate);
   const [currentGoal, setCurrentGoal] =
-    React.useState<CoordinateAndDirection>(goalCoordinate);
+    React.useState<Coordinate>(goalCoordinate);
 
   const [cells, setCells] = React.useState<CellState[][]>(() =>
     buildInitialCells(rows, columns, startCoordinate, goalCoordinate)
@@ -330,7 +330,7 @@ const Board = ({
     return grid;
   };
 
-  const indexOf = (coordinate: CoordinateAndDirection): number =>
+  const indexOf = (coordinate: Coordinate): number =>
     coordinate.row * columns + coordinate.column;
 
   // Generate the maze up front, then animate each wall placement on its tick.
@@ -461,7 +461,7 @@ const Board = ({
     if (!canDropAnchor(row, column)) return;
 
     const from = which === 'start' ? currentStart : currentGoal;
-    const to: CoordinateAndDirection = { row, column, direction: '' };
+    const to: Coordinate = { row, column };
 
     setPaintKind(from.row, from.column, 'empty');
     walls.current.delete(`${row}_${column}`);

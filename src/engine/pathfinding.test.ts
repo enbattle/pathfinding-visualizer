@@ -8,8 +8,6 @@ import {
   type PathAlgorithmId,
   type SearchProblem,
 } from './pathfinding';
-import { unweightedSearch } from '../algorithms/paths';
-import type { CoordinateAndDirection } from '../models/models';
 import {
   assertValidPath,
   gridProblemArbitrary,
@@ -188,65 +186,71 @@ describe('search', () => {
   });
 });
 
-// BFS and DFS exploration order is fully determined by frontier order, so
-// the engine must reproduce the previous implementation (src/algorithms/
-// paths.tsx) exactly: same path, same order of newly discovered cells.
-// (The old code could report a cell as discovered more than once; only
-// each cell's first report ever changed what's on screen, so that's what
-// is compared. Weighted algorithms aren't compared exactly - see the
-// optimality properties above instead - because the engine no longer
-// pushes walls onto the heap, which legitimately changes tie-breaking.)
-describe('equivalence with the previous BFS/DFS implementation', () => {
-  function runOld(
-    problem: GridProblem,
-    algorithm: 'BreadthFirstSearch' | 'DepthFirstSearch'
-  ) {
-    const { columns } = problem;
-    const toCoord = (index: number): CoordinateAndDirection => ({
-      row: Math.floor(index / columns),
-      column: index % columns,
-      direction: '',
-    });
-    const walls = new Set<string>();
-    problem.walls.forEach((isWall, index) => {
-      if (isWall)
-        walls.add(`${Math.floor(index / columns)}_${index % columns}`);
-    });
-    const discovered: number[] = [];
-    const path = unweightedSearch(
-      problem.rows,
-      columns,
-      toCoord(problem.start),
-      toCoord(problem.goal),
-      walls,
-      algorithm,
-      callback => callback(),
-      {
-        onCellVisited: (row, column) => discovered.push(row * columns + column),
-        onGoalPathFill: () => {},
-        onPathDirection: () => {},
-      }
-    );
-    return {
-      path: path && path.map(({ row, column }) => row * columns + column),
-      discovered: [...new Set(discovered)],
-    };
-  }
+// A fixed board that shows how the algorithms differ, drawn as ASCII:
+// '#' wall, '~' weighted terrain (cost 5), 'S'/'G' start/goal.
+const BOARD = `
+.........
+.S..#....
+....#.~~.
+.####.~~.
+......~~G
+.........
+`;
 
-  it.each([
-    ['bfs', 'BreadthFirstSearch'],
-    ['dfs', 'DepthFirstSearch'],
-  ] as const)('%s matches the old %s exactly', (id, oldId) => {
-    fc.assert(
-      fc.property(gridProblemArbitrary({ maxSize: 16 }), problem => {
-        const { events, result } = runSearch(toSearchProblem(problem), id);
-        const old = runOld(problem, oldId);
-        expect(result.path).toEqual(old.path);
-        expect(
-          events.filter(e => e.type === 'discover').map(e => e.index)
-        ).toEqual(old.discovered);
-      }),
-      RUNS
-    );
+function parseBoard(board: string): SearchProblem {
+  const lines = board.trim().split('\n');
+  const grid = createGrid(lines.length, lines[0].length);
+  let start = -1;
+  let goal = -1;
+  lines.forEach((line, row) =>
+    [...line].forEach((cell, column) => {
+      const index = toIndex(grid, row, column);
+      if (cell === '#') grid.walls[index] = 1;
+      if (cell === '~') grid.weights[index] = 5;
+      if (cell === 'S') start = index;
+      if (cell === 'G') goal = index;
+    })
+  );
+  return { grid, start, goal };
+}
+
+// Same board with the result drawn on: '*' path, 'o' expanded but off the
+// path; plus the result's numbers.
+function renderResult(
+  problem: SearchProblem,
+  algorithm: PathAlgorithmId
+): string {
+  const { events, result } = runSearch(problem, algorithm);
+  const { grid, start, goal } = problem;
+  const onPath = new Set(result.path ?? []);
+  const expanded = new Set(
+    events.filter(e => e.type === 'expand').map(e => e.index)
+  );
+  const lines: string[] = [];
+  for (let row = 0; row < grid.rows; row++) {
+    let line = '';
+    for (let column = 0; column < grid.columns; column++) {
+      const index = toIndex(grid, row, column);
+      if (index === start) line += 'S';
+      else if (index === goal) line += 'G';
+      else if (grid.walls[index]) line += '#';
+      else if (onPath.has(index)) line += '*';
+      else if (expanded.has(index)) line += 'o';
+      else line += grid.weights[index] > 1 ? '~' : '.';
+    }
+    lines.push(line);
+  }
+  const summary = `cost ${result.cost}, ${result.path ? result.path.length : 0} cells, expanded ${result.expanded}`;
+  return `\n${lines.join('\n')}\n${summary}\n`;
+}
+
+// Locks in each algorithm's exact exploration and path on one board, so any
+// behavior change shows up as a readable diff in review. BFS/DFS output was
+// proven identical to the pre-engine implementation (src/algorithms/
+// paths.tsx, see git history) before it was removed. Only regenerate
+// (vitest -u) for an intentional change.
+describe('search snapshots', () => {
+  it.each(ALL)('%s', algorithm => {
+    expect(renderResult(parseBoard(BOARD), algorithm)).toMatchSnapshot();
   });
 });

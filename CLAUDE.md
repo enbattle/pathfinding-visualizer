@@ -10,48 +10,57 @@ maze/wall-generation algorithms (Recursive Division, single- and
 double-thickness, and randomized Prim's) on a grid. No backend; deployed
 as a static site to GitHub Pages via `.github/workflows/deploy.yml`.
 
+Architecture overview (layers, data flow, how to add an algorithm):
+[docs/architecture.md](docs/architecture.md). Read it before structural
+changes.
+
 ## Where things live
 
-- `src/algorithms/paths.tsx` - all 5 pathfinding algorithms. BFS/DFS and
-  Dijkstra/A*/Greedy each reduce to one shared `search()` core
-  (frontier-exploration loop), parameterized by which frontier data
-  structure (`Queue`/`Stack`/`PriorityQueueAscend`) and priority function
-  each algorithm uses - see the comment above `search()` before adding a
-  6th algorithm or changing how any existing one explores.
-- `src/algorithms/walls.tsx` - Prim's, plus both Recursive Division
-  variants, which reduce to one shared `buildDividingWalls()`,
-  parameterized by wall thickness (1 or 2 cells). Each wall normally
-  leaves exactly one opening, which is what keeps every generated maze
-  fully connected. The one exception is
-  deliberate: if start/goal's own row (or column, for vertical walls)
-  falls inside the wall's own thickness-span rather than merely being
-  adjacent to it, a single-cell exclusion at its own column isn't enough -
-  the cells beside it _in that same wall line_ would still be walled,
-  sealing off its only remaining access. `isEmbeddedInWall` detects this
-  and widens the exclusion to its immediate neighbors too, so start/goal
-  is never fully boxed in even when dragged onto a coordinate a wall would
-  otherwise run straight through. Regression coverage for this lives in
-  `walls.test.ts`'s "placed anywhere (e.g. after dragging)" suite - keep
-  both that test and the widened-exclusion behavior if you touch the
-  exclusion-zone logic.
-- Animation timing: every algorithm in `paths.tsx`/`walls.tsx` schedules
-  its animated steps through the injected `ScheduleTimeout` (defined in
-  `models.ts`, implemented by `board.tsx`), never `setTimeout` directly.
-  The board tracks every pending step so Reset can cancel it and so
-  Build Walls/Visualize are ignored while anything is still animating -
-  an untracked timer breaks both (regression tests in
+- `src/engine/` - pure TypeScript, no React/DOM. The UI imports only from
+  `src/engine/index.ts`; never import React or touch the DOM from here.
+  - `grid.ts` - the board as flat typed arrays (`walls`, `weights` = cost
+    of entering a cell), `index = row * columns + column`.
+  - `pathfinding.ts` - all 5 algorithms are one generator, `search()`,
+    differing only in their `SPECS` entry (frontier type, admission rule,
+    priority, heuristic). Read the comments on `AdmissionRule` and `SPECS`
+    before adding a 6th algorithm or changing how one explores.
+    `PATH_ALGORITHMS` holds UI labels and each algorithm's optimality
+    guarantee.
+  - `heuristics.ts` - A* must use an admissible, consistent heuristic
+    (Manhattan) or it stops returning lowest-cost paths. Never scale or
+    square it.
+  - `mazes.ts` - `generateMaze()` returns timed `{ index, tick }` wall
+    placements. Recursive Division's walls each leave one opening, which
+    keeps mazes connected; `isEmbeddedInWall` deliberately widens the
+    start/goal exclusion when start/goal sits on a row/column a wall runs
+    straight through - keep it (see its comment).
+  - `random.ts` - randomness is always injected (`Random`); use
+    `seededRandom(seed)` in tests. No bare `Math.random()` in algorithms.
+  - `collections.ts` - `Stack`/`Queue` (O(1)) and `MinHeap` (binary heap
+    with a tiebreak key). Keep them O(1)/O(log n).
+- `src/components/` - React UI. `board.tsx` snapshots its state into an
+  engine `Grid`, runs the engine, and animates the result;
+  `path-segments.ts` picks the CSS class for each cell of the final path.
+- Animation timing: every animated step goes through `board.tsx`'s
+  `scheduleTimeout`, never a bare `setTimeout`. The board tracks every
+  pending step so Reset can cancel it and so Build Walls/Visualize are
+  ignored while anything is still animating (regression tests in
   `configurations.test.tsx`: "resetting mid-wall-build..." and "ignores
   Visualize while walls are still being built").
-- `src/models/models.ts` - the typed data structures the algorithms run
-  on: `Stack`/`Queue`/`PriorityQueueAscend` (a real binary heap, not a
-  sort-per-push array - keep it that way, it's the difference between
-  O(n log n) and O(n² log n) per search) and the
-  `CoordinateAndDirection`/`SearchNode` types. New generic data structures
-  belong here, not back in a `util/` file.
-- `src/util/function-util.tsx` - small math/random helpers used by the
-  algorithms above. `getEuclideanDistance` must return true (not squared)
-  distance - A*'s shortest-path guarantee depends on it never
-  overestimating the real grid distance.
+
+## Testing conventions
+
+- Algorithm correctness is tested with **fast-check property tests**
+  against deliberately naive reference solvers in
+  `src/test-support/grid-problems.ts` (they share no code with the
+  engine). When you change an algorithm, the properties must still hold;
+  when you add one, add it to the relevant properties.
+- **Snapshot tests** (`src/engine/__snapshots__/`) pin each algorithm's
+  exact output on a fixed board/seed as readable ASCII. A snapshot diff
+  means behavior changed - only regenerate (`npx vitest run -u`) when the
+  change is intentional, and say so in the commit message.
+- Before trusting a new property, check it can fail: temporarily break the
+  code it guards and confirm the test goes red.
 
 ## Verifying a change
 

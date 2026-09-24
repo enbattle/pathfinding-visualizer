@@ -20,4 +20,4 @@ export {
   type MazeProblem,
   type WallPlacement,
 } from './mazes';
-export { seededRandom, type Random } from './random';
+export { seededRandom, randomInt, type Random } from './random';

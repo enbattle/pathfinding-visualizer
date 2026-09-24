@@ -6,13 +6,13 @@ import {
   type MazeAlgorithmId,
   type PathAlgorithmId,
 } from '../engine';
-import type { CoordinateAndDirection } from '../models/models';
 import {
   computeBoardSize,
   computeBoardSizeFromDimensions,
   randomStartCoordinate,
   randomGoalCoordinate,
   speedToStepDelay,
+  type Coordinate,
   DEFAULT_SPEED,
 } from './configurations-helpers';
 import {
@@ -68,9 +68,10 @@ const Configuration = () => {
     columns: number;
   } | null>(null);
   const [startCoordinate, setStartCoordinate] =
-    React.useState<CoordinateAndDirection | null>(null);
-  const [goalCoordinate, setGoalCoordinate] =
-    React.useState<CoordinateAndDirection | null>(null);
+    React.useState<Coordinate | null>(null);
+  const [goalCoordinate, setGoalCoordinate] = React.useState<Coordinate | null>(
+    null
+  );
   const boardAreaRef = React.useRef<HTMLDivElement>(null);
 
   React.useLayoutEffect(() => {

@@ -1,5 +1,9 @@
-import { randIntBetween } from '../util/function-util';
-import type { CoordinateAndDirection } from '../models/models';
+import { randomInt } from '../engine';
+
+export interface Coordinate {
+  row: number;
+  column: number;
+}
 
 // Computes the board size (rows/columns) from the current viewport.
 // 28px matches board-cell's fixed size in index.css (1.75rem, border-box) -
@@ -38,29 +42,27 @@ export function computeBoardSize(): { rows: number; columns: number } {
   return computeBoardSizeFromDimensions(window.innerWidth, window.innerHeight);
 }
 
-// Placed one cell inside the outer border (drawn by drawBorderWalls) rather
+// Placed one cell inside the outer border (which every maze walls) rather
 // than on it - a border cell only has 2-3 real neighbors instead of 4, which
-// lets the maze wall it in completely even though recursiveDivision's
+// lets the maze wall it in completely even though Recursive Division's
 // exclusion-zone logic guarantees connectivity for the interior region.
 export function randomStartCoordinate(
   rows: number,
   columns: number
-): CoordinateAndDirection {
+): Coordinate {
   return {
     row: rows - 2,
-    column: randIntBetween(1, Math.floor(columns / 2)),
-    direction: '',
+    column: randomInt(Math.random, 1, Math.floor(columns / 2)),
   };
 }
 
 export function randomGoalCoordinate(
   rows: number,
   columns: number
-): CoordinateAndDirection {
+): Coordinate {
   return {
     row: 1,
-    column: randIntBetween(Math.floor(columns / 2), columns - 2),
-    direction: '',
+    column: randomInt(Math.random, Math.floor(columns / 2), columns - 2),
   };
 }
 

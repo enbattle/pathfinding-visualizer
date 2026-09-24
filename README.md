@@ -32,6 +32,13 @@ npm run test:run     # Vitest, single run (npm test for watch mode)
 npm run build        # production bundle in dist/
 ```
 
+## Architecture
+
+The algorithms live in a pure-TypeScript engine (`src/engine/`) that the
+React UI only animates. It is tested with property-based tests against
+naive reference solvers, plus readable ASCII snapshot tests. See
+[docs/architecture.md](docs/architecture.md).
+
 ## Deployment
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which installs
