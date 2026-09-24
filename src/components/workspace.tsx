@@ -31,6 +31,7 @@ import {
   DEFAULT_SPEED,
 } from './board-setup';
 import { BoardArea } from './board-area';
+import { Segmented } from './segmented';
 import { AboutDialog } from './about-dialog';
 import { ExploreResults, HowItWorks, RaceScoreboard } from './run-results';
 import { useVisualizerSnapshot } from './use-visualizer';
@@ -70,45 +71,6 @@ function randomAnchors(rows: number, columns: number) {
     start: toCellIndex(randomStartCoordinate(rows, columns), columns),
     goal: toCellIndex(randomGoalCoordinate(rows, columns), columns),
   };
-}
-
-// A small two-or-more-option toggle (aria-pressed buttons in a group).
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string; icon?: React.ReactNode }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      className="inline-flex w-fit rounded-lg border border-input bg-input/30 p-0.5"
-    >
-      {options.map(option => (
-        <Button
-          key={option.value}
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-pressed={value === option.value}
-          className={cn(
-            value === option.value &&
-              'bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary'
-          )}
-          onClick={() => onChange(option.value)}
-        >
-          {option.icon}
-          {option.label}
-        </Button>
-      ))}
-    </div>
-  );
 }
 
 function Section({

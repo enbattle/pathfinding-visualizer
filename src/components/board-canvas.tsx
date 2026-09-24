@@ -8,6 +8,7 @@ import {
 } from '../visualizer/visualizer';
 import { drawBoard, readPalette, type BoardPalette } from './board-renderer';
 import { CELL_SIZE_PX } from './board-setup';
+import { usePrefersReducedMotion } from './use-reduced-motion';
 
 interface BoardCanvasProps {
   visualizer: Visualizer;
@@ -68,6 +69,7 @@ export function BoardCanvas({
   const [cellSize, setCellSize] = React.useState(CELL_SIZE_PX);
   const [cursor, setCursor] = React.useState<number | null>(null);
   const [announcement, setAnnouncement] = React.useState('');
+  const reducedMotion = usePrefersReducedMotion();
   const carryingRef = React.useRef(false);
   const lastCellRef = React.useRef<number | null>(null);
 
@@ -115,7 +117,8 @@ export function BoardCanvas({
       drawBoard(ctx, snapshot, {
         run: snapshot.runs[runIndex] ?? null,
         tick,
-        animationTicks: animationTicks(rate),
+        // With reduced motion, cells appear settled (no entrance animation).
+        animationTicks: reducedMotion ? 0 : animationTicks(rate),
         cellSize,
         palette,
         cursor,
@@ -133,7 +136,7 @@ export function BoardCanvas({
       unsubscribePlayer();
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [visualizer, runIndex, rows, columns, cellSize, cursor]);
+  }, [visualizer, runIndex, rows, columns, cellSize, cursor, reducedMotion]);
 
   const cellAt = (clientX: number, clientY: number): number | null => {
     const canvas = canvasRef.current;
