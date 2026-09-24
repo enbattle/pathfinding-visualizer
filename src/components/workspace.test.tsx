@@ -337,7 +337,11 @@ describe('Workspace: race mode', () => {
       const row = rows.find(r => r.textContent?.includes(name))!;
       expect(within(row).getByLabelText('Yes')).toBeInTheDocument();
     }
-    expect(within(standings).getByLabelText('First')).toBeInTheDocument();
+    // Ties share first place, and start/goal columns are random, so more than
+    // one racer can hold it.
+    expect(
+      within(standings).getAllByLabelText('First').length
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps 2 to 4 racers selected', () => {
