@@ -4,6 +4,21 @@ Welcome to my Pathfinding Visualizer! In a recent pursuit, I had been exposed to
 
 You can access it here: https://enbattle.github.io/pathfinding-visualizer/
 
+## Features
+
+- **Explore**: watch one algorithm search, with its pseudocode highlighted
+  step by step, live stats, and a check of whether its path is the
+  cheapest possible.
+- **Race**: run 2–4 algorithms side by side on the same board, one cell
+  per step each, with live standings: who reached the goal with the least
+  work, and whose path is actually shortest.
+- **Playback**: pause, step, and scrub any run forwards or backwards.
+- **Live editing**: paint walls and weighted terrain, drag start/goal, or
+  generate a maze; once a path is shown, edits update it instantly.
+- **Share**: copy a link that reopens the exact board and replays the run.
+- **Accessible**: the board is keyboard-operable (arrow keys, Space) and
+  announces the cell under the cursor to screen readers.
+
 ## Current Pathfinding Algorithm Selection
 
 - Dijkstra's Algorithm

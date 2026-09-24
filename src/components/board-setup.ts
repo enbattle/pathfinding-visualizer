@@ -14,7 +14,7 @@ export const CELL_SIZE_PX = 28;
 // Shared floor-at-20 math, factored out so it can be applied either to the
 // raw window (first-paint guess, before anything has actually laid out) or
 // to a measured container's real content-box size (see
-// computeBoardSize below and its caller in configurations.tsx).
+// computeBoardSize below and its caller in workspace.tsx).
 export function computeBoardSizeFromDimensions(
   widthPx: number,
   heightPx: number
@@ -32,7 +32,7 @@ export function computeBoardSizeFromDimensions(
 
 // First-paint guess only, based on the full window - it ignores the side
 // panel/padding/gaps around the board, so it's always an overestimate of
-// the board's actual available space. configurations.tsx immediately
+// the board's actual available space. workspace.tsx immediately
 // corrects this via a layout effect that measures the real board
 // container and calls computeBoardSizeFromDimensions with its actual size,
 // before the browser paints - this window-based guess only exists so

@@ -1,20 +1,29 @@
-import { entranceProgress, isRevealed, NEVER } from '../visualizer/runs';
+import {
+  entranceProgress,
+  isRevealed,
+  NEVER,
+  type Run,
+} from '../visualizer/runs';
 import type { VisualizerSnapshot } from '../visualizer/visualizer';
 
-// Draws the board onto a 2D canvas. Everything here is a pure function of
-// (board snapshot, playhead tick): no state, no timers, so scrubbing the
-// playhead backwards or forwards always draws exactly the right frame.
+// Draws one board (the shared grid plus one run) onto a 2D canvas.
+// Everything here is a pure function of (board snapshot, run, playhead
+// tick): no state and no timers, so scrubbing the playhead backwards or
+// forwards always draws exactly the right frame.
 
 /** What a cell shows at a given playhead position. */
 export type CellLayer =
   | { readonly type: 'empty' }
   | { readonly type: 'weight' }
-  | { readonly type: 'anchor'; readonly label: 'S' | 'G' }
+  | { readonly type: 'start' }
+  | { readonly type: 'goal' }
   | { readonly type: 'wall'; readonly progress: number }
   | {
       readonly type: 'visited';
       readonly progress: number;
       readonly weighted: boolean;
+      /** Discovery order, 0 (first) to 1 (last) - drives the color ramp. */
+      readonly order: number;
     }
   | {
       readonly type: 'path';
@@ -24,13 +33,14 @@ export type CellLayer =
 
 export function cellLayer(
   snapshot: VisualizerSnapshot,
+  run: Run | null,
   index: number,
   tick: number,
   animationTicks: number
 ): CellLayer {
-  const { grid, run } = snapshot;
-  if (index === snapshot.start) return { type: 'anchor', label: 'S' };
-  if (index === snapshot.goal) return { type: 'anchor', label: 'G' };
+  const { grid } = snapshot;
+  if (index === snapshot.start) return { type: 'start' };
+  if (index === snapshot.goal) return { type: 'goal' };
 
   if (grid.walls[index]) {
     // While a maze animates, its walls appear on their own ticks; walls the
@@ -61,6 +71,7 @@ export function cellLayer(
         type: 'visited',
         progress: entranceProgress(discoverTick, tick, animationTicks),
         weighted,
+        order: run.discoveries > 1 ? discoverTick / (run.discoveries - 1) : 0,
       };
     }
   }
@@ -73,29 +84,40 @@ export interface BoardPalette {
   readonly empty: string;
   readonly wall: string;
   readonly weight: string;
-  readonly anchor: string;
+  readonly weightMark: string;
+  readonly start: string;
+  readonly goal: string;
   readonly anchorText: string;
-  readonly visitedFrom: string;
-  readonly visitedTo: string;
-  readonly pathFrom: string;
-  readonly pathTo: string;
+  /** Color a newly discovered cell flashes in with. */
+  readonly visitedFlash: string;
+  /** Settled visited color for the first-discovered cells... */
+  readonly visitedNear: string;
+  /** ...blending to this for the last-discovered ones. */
+  readonly visitedFar: string;
+  readonly pathFlash: string;
+  readonly path: string;
   readonly pathLine: string;
+  readonly pathGlow: string;
   readonly cursor: string;
 }
 
 const FALLBACK_PALETTE: BoardPalette = {
-  gridLine: '#0b0e14',
-  empty: '#171a23',
-  wall: '#483c32',
-  weight: '#b8860b',
-  anchor: '#ffd700',
-  anchorText: '#1a1300',
-  visitedFrom: '#f5f5dc',
-  visitedTo: '#7fffd4',
-  pathFrom: '#ff4500',
-  pathTo: '#ffff00',
-  pathLine: '#0b0e14',
-  cursor: '#22d3ee',
+  gridLine: '#0a0d13',
+  empty: '#161b26',
+  wall: '#c7d2e0',
+  weight: '#3d2e16',
+  weightMark: '#f59e0b',
+  start: '#22c55e',
+  goal: '#f43f5e',
+  anchorText: '#05080d',
+  visitedFlash: '#e0f2fe',
+  visitedNear: '#22d3ee',
+  visitedFar: '#6366f1',
+  pathFlash: '#fff7ed',
+  path: '#fbbf24',
+  pathLine: '#fffbeb',
+  pathGlow: '#fbbf24',
+  cursor: '#f8fafc',
 };
 
 const PALETTE_VARIABLES: Record<keyof BoardPalette, string> = {
@@ -103,13 +125,17 @@ const PALETTE_VARIABLES: Record<keyof BoardPalette, string> = {
   empty: '--board-empty',
   wall: '--board-wall',
   weight: '--board-weight',
-  anchor: '--board-anchor',
+  weightMark: '--board-weight-mark',
+  start: '--board-start',
+  goal: '--board-goal',
   anchorText: '--board-anchor-text',
-  visitedFrom: '--board-visited-from',
-  visitedTo: '--board-visited-to',
-  pathFrom: '--board-path-from',
-  pathTo: '--board-path-to',
+  visitedFlash: '--board-visited-flash',
+  visitedNear: '--board-visited-near',
+  visitedFar: '--board-visited-far',
+  pathFlash: '--board-path-flash',
+  path: '--board-path',
   pathLine: '--board-path-line',
+  pathGlow: '--board-path-glow',
   cursor: '--board-cursor',
 };
 
@@ -152,9 +178,44 @@ export function mixColor(from: string, to: string, amount: number): string {
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
+// Settled visited cells use one of this many colors along the ramp, so they
+// still batch into a few fills.
+const RAMP_STEPS = 24;
+
+// Precomputed colors for one palette.
+class ColorCache {
+  private readonly ramp: string[];
+  private readonly mixes = new Map<string, string>();
+
+  constructor(readonly palette: BoardPalette) {
+    this.ramp = Array.from({ length: RAMP_STEPS }, (_, i) =>
+      mixColor(palette.visitedNear, palette.visitedFar, i / (RAMP_STEPS - 1))
+    );
+  }
+
+  visited(order: number): string {
+    return this.ramp[Math.round(order * (RAMP_STEPS - 1))];
+  }
+
+  // Entrance colors, quantized to 1/16ths of the animation.
+  entrance(from: string, to: string, progress: number): string {
+    const step = Math.round(progress * 16);
+    const key = `${from}|${to}|${step}`;
+    let color = this.mixes.get(key);
+    if (!color) this.mixes.set(key, (color = mixColor(from, to, step / 16)));
+    return color;
+  }
+}
+
+const colorCaches = new WeakMap<BoardPalette, ColorCache>();
+function colorsFor(palette: BoardPalette): ColorCache {
+  let cache = colorCaches.get(palette);
+  if (!cache) colorCaches.set(palette, (cache = new ColorCache(palette)));
+  return cache;
+}
+
 // Settled cells are bucketed by color and filled with one fill() per color
-// (a few draw calls per frame instead of one per cell); only cells still
-// mid-animation get their own color.
+// (a few dozen draw calls per frame instead of one per cell).
 class CellBatch {
   private readonly shapes = new Map<string, number[]>();
 
@@ -169,12 +230,10 @@ class CellBatch {
       ctx.fillStyle = color;
       ctx.beginPath();
       for (let i = 0; i < list.length; i += 4) {
-        const [x, y, size, radius] = [
-          list[i],
-          list[i + 1],
-          list[i + 2],
-          list[i + 3],
-        ];
+        const x = list[i];
+        const y = list[i + 1];
+        const size = list[i + 2];
+        const radius = list[i + 3];
         if (ctx.roundRect) ctx.roundRect(x, y, size, size, radius);
         else ctx.rect(x, y, size, size);
       }
@@ -184,6 +243,8 @@ class CellBatch {
 }
 
 export interface DrawOptions {
+  /** Which run to draw on the board (null: just the board). */
+  readonly run: Run | null;
   readonly tick: number;
   readonly animationTicks: number;
   /** CSS pixels per cell. */
@@ -199,12 +260,13 @@ const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 export function drawBoard(
   ctx: CanvasRenderingContext2D,
   snapshot: VisualizerSnapshot,
-  { tick, animationTicks, cellSize, palette, cursor }: DrawOptions
+  { run, tick, animationTicks, cellSize, palette, cursor }: DrawOptions
 ): void {
   const { rows, columns } = snapshot.grid;
+  const colors = colorsFor(palette);
   const gap = Math.max(1, Math.round(cellSize * 0.08));
   const inner = cellSize - gap;
-  const radius = inner * 0.22;
+  const radius = inner * 0.24;
 
   ctx.fillStyle = palette.gridLine;
   ctx.fillRect(0, 0, columns * cellSize, rows * cellSize);
@@ -232,8 +294,25 @@ export function drawBoard(
     };
   };
 
+  // An overlay that grows in over a base cell, blending from `flash` to its
+  // settled color.
+  const addEntrance = (
+    index: number,
+    base: string,
+    flash: string,
+    settled: string,
+    progress: number
+  ) => {
+    addCell(index, base);
+    return addCell(
+      index,
+      progress < 1 ? colors.entrance(flash, settled, progress) : settled,
+      progress
+    );
+  };
+
   for (let index = 0; index < rows * columns; index++) {
-    const layer = cellLayer(snapshot, index, tick, animationTicks);
+    const layer = cellLayer(snapshot, run, index, tick, animationTicks);
     switch (layer.type) {
       case 'empty':
         addCell(index, palette.empty);
@@ -241,29 +320,38 @@ export function drawBoard(
       case 'weight':
         weightMarks.push(addCell(index, palette.weight));
         break;
-      case 'anchor':
-        labels.push({ ...addCell(index, palette.anchor), label: layer.label });
+      case 'start':
+        labels.push({ ...addCell(index, palette.start), label: 'S' });
+        break;
+      case 'goal':
+        labels.push({ ...addCell(index, palette.goal), label: 'G' });
         break;
       case 'wall':
-        addCell(index, palette.empty);
-        addCell(
+        addEntrance(
           index,
-          layer.progress < 1
-            ? mixColor(palette.visitedFrom, palette.wall, layer.progress)
-            : palette.wall,
+          palette.empty,
+          palette.empty,
+          palette.wall,
           layer.progress
         );
         break;
-      case 'visited':
-      case 'path': {
-        const [from, to] =
-          layer.type === 'path'
-            ? [palette.pathFrom, palette.pathTo]
-            : [palette.visitedFrom, palette.visitedTo];
-        addCell(index, layer.weighted ? palette.weight : palette.empty);
-        const center = addCell(
+      case 'visited': {
+        const center = addEntrance(
           index,
-          layer.progress < 1 ? mixColor(from, to, layer.progress) : to,
+          layer.weighted ? palette.weight : palette.empty,
+          palette.visitedFlash,
+          colors.visited(layer.order),
+          layer.progress
+        );
+        if (layer.weighted) weightMarks.push(center);
+        break;
+      }
+      case 'path': {
+        const center = addEntrance(
+          index,
+          layer.weighted ? palette.weight : palette.empty,
+          palette.pathFlash,
+          palette.path,
           layer.progress
         );
         if (layer.weighted) weightMarks.push(center);
@@ -274,14 +362,18 @@ export function drawBoard(
   batch.fill(ctx);
 
   // Weighted terrain keeps a small marker even under the search overlay.
-  ctx.fillStyle = palette.weight;
-  for (const { x, y } of weightMarks) {
+  if (weightMarks.length > 0) {
+    ctx.fillStyle = palette.weightMark;
     ctx.beginPath();
-    ctx.arc(x, y, Math.max(1.5, inner * 0.14), 0, Math.PI * 2);
+    const markRadius = Math.max(1.5, inner * 0.14);
+    for (const { x, y } of weightMarks) {
+      ctx.moveTo(x + markRadius, y);
+      ctx.arc(x, y, markRadius, 0, Math.PI * 2);
+    }
     ctx.fill();
   }
 
-  drawPathLine(ctx, snapshot, tick, cellSize, palette);
+  drawPathLine(ctx, snapshot, run, tick, cellSize, palette);
 
   ctx.fillStyle = palette.anchorText;
   ctx.font = `700 ${Math.round(inner * 0.5)}px system-ui, sans-serif`;
@@ -303,16 +395,16 @@ export function drawBoard(
   }
 }
 
-// The found path as a line through cell centers, growing with the playhead
-// and joining the goal once the last path cell is drawn.
+// The found path as a glowing line through cell centers, growing with the
+// playhead and joining the goal once the last path cell is drawn.
 function drawPathLine(
   ctx: CanvasRenderingContext2D,
   snapshot: VisualizerSnapshot,
+  run: Run | null,
   tick: number,
   cellSize: number,
   palette: BoardPalette
 ): void {
-  const run = snapshot.run;
   const path = run?.kind === 'search' ? run.result.path : null;
   if (!run || run.kind !== 'search' || !path || path.length < 2) return;
 
@@ -323,22 +415,33 @@ function drawPathLine(
     return [column * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
   };
 
-  ctx.strokeStyle = palette.pathLine;
-  ctx.lineWidth = Math.max(2, cellSize * 0.16);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
   // Revealed prefix of the path: every interior cell whose tick has passed,
   // then the goal once the whole run has played.
-  let segments = 0;
-  ctx.beginPath();
-  ctx.moveTo(...center(path[0]));
+  const points: [number, number][] = [center(path[0])];
   for (let i = 1; i < path.length; i++) {
     const isGoal = i === path.length - 1;
     if (!isGoal && !isRevealed(run.pathTick[path[i]], tick)) break;
     if (isGoal && tick < run.length) break;
-    ctx.lineTo(...center(path[i]));
-    segments++;
+    points.push(center(path[i]));
   }
   // (A zero-length stroke would still draw a round-capped dot.)
-  if (segments > 0) ctx.stroke();
+  if (points.length < 2) return;
+
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(...points[0]);
+    for (const point of points.slice(1)) ctx.lineTo(...point);
+    ctx.stroke();
+  };
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Glow: a wide translucent stroke under a thin bright one.
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = palette.pathGlow;
+  ctx.lineWidth = Math.max(4, cellSize * 0.55);
+  trace();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = palette.pathLine;
+  ctx.lineWidth = Math.max(1.5, cellSize * 0.14);
+  trace();
 }

@@ -8,7 +8,7 @@ import {
   CELL_SIZE_PX,
   MIN_STEP_DELAY,
   MAX_STEP_DELAY,
-} from './configurations-helpers';
+} from './board-setup';
 
 function setViewport(width: number, height: number): void {
   Object.defineProperty(window, 'innerWidth', {

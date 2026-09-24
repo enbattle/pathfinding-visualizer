@@ -1,11 +1,7 @@
-import Configuration from './components/configurations';
+import Workspace from './components/workspace';
 
 function App() {
-  return (
-    <main id="main" role="main">
-      <Configuration />
-    </main>
-  );
+  return <Workspace />;
 }
 
 export default App;

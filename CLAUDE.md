@@ -49,11 +49,22 @@ changes.
   - `runs.ts` - a run as per-cell reveal ticks (`discoverTick`,
     `pathTick`, `wallTick`): cell `i` is visible once the playhead passes
     its tick. That's what makes scrubbing/stepping trivial.
-- `src/components/` - React UI, kept thin. `board-renderer.ts` draws a
-  frame as a pure function of (snapshot, tick) - `cellLayer()` holds the
-  "what does this cell look like now" logic and is unit-tested;
-  `board-canvas.tsx` does sizing, redraw scheduling, pointer and keyboard
-  input; `playback-controls.tsx`; `configurations.tsx` is the page.
+  - `share.ts` - share links (`#v=1&b=…&m=…&a=…`). Links are **untrusted
+    input**: `decodeShare` must never throw and must reject anything
+    outside its limits (see the fuzz tests in `share.test.ts`). If you
+    change the binary layout, bump `SHARE_VERSION` - old links must fail
+    cleanly, not decode into a different board.
+- `src/components/` - React UI, kept thin.
+  - `workspace.tsx` is the page (mode, sidebar, share/load);
+    `board-area.tsx` lays out one board or a race grid, plus playback and
+    the legend; `run-results.tsx` has the explore stats, the pseudocode
+    panel and the race standings.
+  - `board-renderer.ts` draws a frame as a pure function of
+    (snapshot, run, tick) - `cellLayer()` holds the "what does this cell
+    look like now" logic and is unit-tested; `board-canvas.tsx` does
+    sizing, redraw scheduling, pointer and keyboard input.
+  - `algorithm-guides.ts` - per-algorithm pseudocode and explanations.
+    Keep the pseudocode in step with `SPECS` in `engine/pathfinding.ts`.
 - Animation: never use `setTimeout`/`setInterval` to animate. Anything
   that changes over time goes through the `Player`, and everything drawn
   must be derivable from (snapshot, tick) - otherwise scrubbing breaks.

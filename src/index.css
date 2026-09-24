@@ -6,18 +6,24 @@
      board-renderer.ts, readPalette) and by the legend swatches below. Hex
      values only: the renderer blends between them for entrance
      animations. */
-  --board-grid-line: #0b0e14;
-  --board-empty: #171a23;
-  --board-wall: #483c32;
-  --board-weight: #b8860b;
-  --board-anchor: #ffd700;
-  --board-anchor-text: #1a1300;
-  --board-visited-from: #f5f5dc;
-  --board-visited-to: #7fffd4;
-  --board-path-from: #ff4500;
-  --board-path-to: #ffff00;
-  --board-path-line: #0b0e14;
-  --board-cursor: #22d3ee;
+  --board-grid-line: #0a0d13;
+  --board-empty: #161b26;
+  --board-wall: #c7d2e0;
+  --board-weight: #3d2e16;
+  --board-weight-mark: #f59e0b;
+  --board-start: #22c55e;
+  --board-goal: #f43f5e;
+  --board-anchor-text: #05080d;
+  /* Visited cells flash in, then settle on a ramp from near (discovered
+     first) to far (discovered last), which shows the search's wavefront. */
+  --board-visited-flash: #e0f2fe;
+  --board-visited-near: #22d3ee;
+  --board-visited-far: #6366f1;
+  --board-path-flash: #fff7ed;
+  --board-path: #fbbf24;
+  --board-path-line: #fffbeb;
+  --board-path-glow: #fbbf24;
+  --board-cursor: #f8fafc;
 
   /* App theme - neutral dark surfaces with a single cyan accent, registered
      below as Tailwind color utilities (bg-background, text-foreground, etc.)
@@ -96,7 +102,7 @@ code {
     source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Legend swatches (src/components/configurations.tsx): static color keys
+/* Legend swatches (src/components/board-area.tsx): static color keys
    for the board colors above. */
 @utility legend-swatch {
   display: inline-block;
@@ -106,8 +112,12 @@ code {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-@utility legend-swatch-anchor {
-  background-color: var(--board-anchor);
+@utility legend-swatch-start {
+  background-color: var(--board-start);
+}
+
+@utility legend-swatch-goal {
+  background-color: var(--board-goal);
 }
 
 @utility legend-swatch-wall {
@@ -116,12 +126,21 @@ code {
 
 @utility legend-swatch-weight {
   background-color: var(--board-weight);
+  background-image: radial-gradient(
+    circle,
+    var(--board-weight-mark) 0 28%,
+    transparent 30%
+  );
 }
 
 @utility legend-swatch-visited {
-  background-color: var(--board-visited-to);
+  background-image: linear-gradient(
+    90deg,
+    var(--board-visited-near),
+    var(--board-visited-far)
+  );
 }
 
 @utility legend-swatch-path {
-  background-color: var(--board-path-to);
+  background-color: var(--board-path);
 }

@@ -7,11 +7,15 @@ import {
   type Visualizer,
 } from '../visualizer/visualizer';
 import { drawBoard, readPalette, type BoardPalette } from './board-renderer';
-import { CELL_SIZE_PX } from './configurations-helpers';
+import { CELL_SIZE_PX } from './board-setup';
 
 interface BoardCanvasProps {
   visualizer: Visualizer;
   paintMode: PaintMode;
+  /** Which of the snapshot's runs this board shows (races show several). */
+  runIndex?: number;
+  /** Accessible name prefix, e.g. the algorithm raced on this board. */
+  label?: string;
   className?: string;
 }
 
@@ -55,6 +59,8 @@ function fitCellSize(
 export function BoardCanvas({
   visualizer,
   paintMode,
+  runIndex = 0,
+  label = 'Board',
   className,
 }: BoardCanvasProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -105,7 +111,9 @@ export function BoardCanvas({
       frame = null;
       const { tick, rate } = visualizer.player.getState();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawBoard(ctx, visualizer.getSnapshot(), {
+      const snapshot = visualizer.getSnapshot();
+      drawBoard(ctx, snapshot, {
+        run: snapshot.runs[runIndex] ?? null,
         tick,
         animationTicks: animationTicks(rate),
         cellSize,
@@ -125,7 +133,7 @@ export function BoardCanvas({
       unsubscribePlayer();
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [visualizer, rows, columns, cellSize, cursor]);
+  }, [visualizer, runIndex, rows, columns, cellSize, cursor]);
 
   const cellAt = (clientX: number, clientY: number): number | null => {
     const canvas = canvasRef.current;
@@ -224,41 +232,43 @@ export function BoardCanvas({
     }
   };
 
+  // The canvas sits in an absolutely positioned layer, so its own size never
+  // feeds back into the container it's measured against (which would let a
+  // board grow its container, then itself, then its container...).
   return (
     <div
       ref={containerRef}
-      className={cn(
-        'flex h-full w-full items-center justify-center',
-        className
-      )}
+      className={cn('relative h-full min-h-0 w-full', className)}
     >
-      <canvas
-        ref={canvasRef}
-        role="application"
-        aria-roledescription="pathfinding board"
-        aria-label={`Board, ${rows} rows by ${columns} columns. Arrow keys move the cursor; Space paints or erases a cell, or picks up and drops the start or goal marker.`}
-        tabIndex={0}
-        className="touch-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        style={{ width: columns * cellSize, height: rows * cellSize }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endPointerGesture}
-        onPointerCancel={endPointerGesture}
-        onKeyDown={handleKeyDown}
-        onFocus={event => {
-          // Show the cursor for keyboard focus only, not after a click.
-          if (isFocusVisible(event.currentTarget)) {
-            setCursor(c => c ?? visualizer.getSnapshot().start);
-          }
-        }}
-        onBlur={() => {
-          setCursor(null);
-          if (carryingRef.current) {
-            carryingRef.current = false;
-            visualizer.endGesture();
-          }
-        }}
-      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <canvas
+          ref={canvasRef}
+          role="application"
+          aria-roledescription="pathfinding board"
+          aria-label={`${label}, ${rows} rows by ${columns} columns. Arrow keys move the cursor; Space paints or erases a cell, or picks up and drops the start or goal marker.`}
+          tabIndex={0}
+          className="touch-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{ width: columns * cellSize, height: rows * cellSize }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endPointerGesture}
+          onPointerCancel={endPointerGesture}
+          onKeyDown={handleKeyDown}
+          onFocus={event => {
+            // Show the cursor for keyboard focus only, not after a click.
+            if (isFocusVisible(event.currentTarget)) {
+              setCursor(c => c ?? visualizer.getSnapshot().start);
+            }
+          }}
+          onBlur={() => {
+            setCursor(null);
+            if (carryingRef.current) {
+              carryingRef.current = false;
+              visualizer.endGesture();
+            }
+          }}
+        />
+      </div>
       <div className="sr-only" aria-live="polite">
         {announcement}
       </div>
