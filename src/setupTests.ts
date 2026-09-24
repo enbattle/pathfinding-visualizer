@@ -27,5 +27,8 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // on every render. The board renderer skips drawing without a context, and
 // its drawing code is tested against a recording fake instead
 // (board-renderer.test.ts).
-HTMLCanvasElement.prototype.getContext = (() =>
-  null) as unknown as HTMLCanvasElement['getContext'];
+// (Guarded: benchmarks share this setup but run in plain Node, no DOM.)
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() =>
+    null) as unknown as HTMLCanvasElement['getContext'];
+}
