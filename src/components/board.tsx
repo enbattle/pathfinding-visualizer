@@ -149,7 +149,11 @@ const Board = ({
   // (clearTimeout) instead of letting them keep firing and mutating state
   // after the board's already been cleared. It also doubles as the "is
   // anything still animating?" check that gates Build Walls/Visualize.
-  const timeoutIdsRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+  // A Set (not an array) so each fired step untracks itself in O(1) - a
+  // maze build schedules on the order of a thousand steps.
+  const timeoutIdsRef = React.useRef<Set<ReturnType<typeof setTimeout>>>(
+    new Set()
+  );
 
   // Contains all the walls on the board
   const walls = React.useRef<Set<string>>(new Set<string>());
@@ -178,18 +182,16 @@ const Board = ({
     (callback: () => void, delay: number): void => {
       const id = setTimeout(() => {
         callback();
-        timeoutIdsRef.current = timeoutIdsRef.current.filter(
-          existingId => existingId !== id
-        );
+        timeoutIdsRef.current.delete(id);
       }, delay);
-      timeoutIdsRef.current.push(id);
+      timeoutIdsRef.current.add(id);
     },
     []
   );
 
   const cancelPendingTimeouts = (): void => {
     timeoutIdsRef.current.forEach(id => clearTimeout(id));
-    timeoutIdsRef.current = [];
+    timeoutIdsRef.current.clear();
   };
 
   // Tracks which cells have already been counted, so a cell discovered as
@@ -756,7 +758,7 @@ const Board = ({
 
   // Check if walls can/should be built
   React.useEffect(() => {
-    if (shouldBuildWalls && timeoutIdsRef.current.length === 0) {
+    if (shouldBuildWalls && timeoutIdsRef.current.size === 0) {
       addRecursiveWalls();
     } else {
       setShouldBuildWalls(false);
@@ -766,7 +768,7 @@ const Board = ({
 
   // Check if algorithm can/should be run
   React.useEffect(() => {
-    if (shouldVisualizePathAlgorithm && timeoutIdsRef.current.length === 0) {
+    if (shouldVisualizePathAlgorithm && timeoutIdsRef.current.size === 0) {
       runVisualizeAlgorithm();
     } else {
       setShouldVisualizePathAlgorithm(false);
