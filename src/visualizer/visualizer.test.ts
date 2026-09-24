@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { runSearch, seededRandom } from '../engine';
 import { FakeClock } from '../test-support/fake-clock';
+import { decodeShare, encodeShare } from './share';
 import {
   NO_PATH_MESSAGE,
   Visualizer,
@@ -44,7 +45,10 @@ describe('Visualizer', () => {
     it('runs the search and plays it from the start', () => {
       const { visualizer } = create();
       visualizer.visualize('bfs');
-      const { run, error } = visualizer.getSnapshot();
+      const {
+        runs: [run = null],
+        error,
+      } = visualizer.getSnapshot();
       expect(run?.kind).toBe('search');
       expect(error).toBeNull();
       const player = visualizer.player.getState();
@@ -78,7 +82,9 @@ describe('Visualizer', () => {
       visualizer.visualize('bfs');
       clock.runUntilIdle();
       visualizer.visualize('dfs');
-      expect(visualizer.getSnapshot().run).toMatchObject({ algorithm: 'dfs' });
+      expect(visualizer.getSnapshot().runs[0]).toMatchObject({
+        algorithm: 'dfs',
+      });
       expect(visualizer.player.getState()).toMatchObject({
         tick: 0,
         playing: true,
@@ -95,7 +101,10 @@ describe('Visualizer', () => {
       visualizer.endGesture();
 
       visualizer.buildMaze('prims', seededRandom(1));
-      const { grid, run } = visualizer.getSnapshot();
+      const {
+        grid,
+        runs: [run = null],
+      } = visualizer.getSnapshot();
       expect(run?.kind).toBe('maze');
       expect(grid.walls[START]).toBe(0);
       expect(grid.walls[GOAL]).toBe(0);
@@ -116,7 +125,10 @@ describe('Visualizer', () => {
       visualizer.buildMaze('recursive-division', seededRandom(7));
       clock.advance(50); // part-way through the build animation
       visualizer.visualize('bfs');
-      const { grid, run } = visualizer.getSnapshot();
+      const {
+        grid,
+        runs: [run = null],
+      } = visualizer.getSnapshot();
       const expected = runSearch({ grid, start: START, goal: GOAL }, 'bfs');
       expect(run?.kind === 'search' && run.result).toEqual(expected.result);
     });
@@ -130,7 +142,7 @@ describe('Visualizer', () => {
       visualizer.visualize('bfs');
       visualizer.resetPath();
       const snapshot = visualizer.getSnapshot();
-      expect(snapshot.run).toBeNull();
+      expect(snapshot.runs).toEqual([]);
       expect(snapshot.error).toBeNull();
       expect([...snapshot.grid.walls]).toEqual(walls);
       expect(visualizer.player.getState()).toMatchObject({
@@ -147,7 +159,7 @@ describe('Visualizer', () => {
       const snapshot = visualizer.getSnapshot();
       expect(snapshot.grid.walls.every(wall => wall === 0)).toBe(true);
       expect(snapshot.grid.weights.every(weight => weight === 1)).toBe(true);
-      expect(snapshot).toMatchObject({ start: 0, goal: 34, run: null });
+      expect(snapshot).toMatchObject({ start: 0, goal: 34, runs: [] });
       expect(clock.pendingFrames).toBe(0);
     });
   });
@@ -207,7 +219,10 @@ describe('Visualizer', () => {
       visualizer.beginGesture(GOAL, 'wall');
       visualizer.continueGesture(at(0, 6));
       visualizer.endGesture();
-      const { run, grid } = visualizer.getSnapshot();
+      const {
+        runs: [run = null],
+        grid,
+      } = visualizer.getSnapshot();
       const expected = runSearch({ grid, start: START, goal: at(0, 6) }, 'bfs');
       expect(run?.kind === 'search' && run.result).toEqual(expected.result);
       const player = visualizer.player.getState();
@@ -221,7 +236,7 @@ describe('Visualizer', () => {
       clock.advance(30);
       visualizer.beginGesture(at(0, 0), 'weight');
       visualizer.endGesture();
-      expect(visualizer.getSnapshot().run).toBeNull();
+      expect(visualizer.getSnapshot().runs).toEqual([]);
       expect(visualizer.player.getState().length).toBe(0);
     });
   });
@@ -229,7 +244,7 @@ describe('Visualizer', () => {
   it('keeps the timeline covering the final animation when the speed changes', () => {
     const { visualizer } = create();
     visualizer.visualize('bfs');
-    const runLength = visualizer.getSnapshot().run!.length;
+    const runLength = visualizer.getSnapshot().runs[0].length;
     visualizer.setRate(400);
     expect(visualizer.player.getState().length).toBe(
       runLength + Math.ceil(400 * 0.35)
@@ -274,6 +289,13 @@ describe('Visualizer', () => {
         ),
       }),
       fc.record({ type: fc.constant('maze' as const), seed: fc.integer() }),
+      fc.record({
+        type: fc.constant('race' as const),
+        algorithms: fc.shuffledSubarray(
+          ['bfs', 'dfs', 'greedy', 'dijkstra', 'astar'] as const,
+          { minLength: 2, maxLength: 4 }
+        ),
+      }),
       fc.record({ type: fc.constant('frames' as const), ms: fc.nat(200) }),
       fc.constant({ type: 'resetPath' as const }),
       fc.constant({ type: 'resetAll' as const })
@@ -289,27 +311,171 @@ describe('Visualizer', () => {
               visualizer.continueGesture(cell);
             visualizer.endGesture();
           } else if (c.type === 'visualize') visualizer.visualize(c.algorithm);
+          else if (c.type === 'race') visualizer.race(c.algorithms);
           else if (c.type === 'maze')
             visualizer.buildMaze('recursive-division', seededRandom(c.seed));
           else if (c.type === 'frames') clock.advance(c.ms);
           else if (c.type === 'resetPath') visualizer.resetPath();
           else visualizer.resetAll();
 
-          const { grid, start, goal, run } = visualizer.getSnapshot();
+          const { grid, start, goal, runs } = visualizer.getSnapshot();
           expect(start).not.toBe(goal);
           expect(grid.walls[start] + grid.walls[goal]).toBe(0);
           expect(grid.weights[start] + grid.weights[goal]).toBe(2);
-          if (run?.kind === 'search') {
+          for (const run of runs) {
+            if (run.kind !== 'search') continue;
             const fresh = runSearch({ grid, start, goal }, run.algorithm);
             expect(run.result).toEqual(fresh.result);
           }
           const player = visualizer.player.getState();
           expect(player.tick).toBeGreaterThanOrEqual(0);
           expect(player.tick).toBeLessThanOrEqual(player.length);
-          if (!run) expect(player.length).toBe(0);
+          if (runs.length === 0) expect(player.length).toBe(0);
         }
       }),
       { numRuns: 300 }
     );
+  });
+
+  describe('race', () => {
+    it('runs every algorithm on the same board, in lockstep on one timeline', () => {
+      const { visualizer } = create();
+      visualizer.race(['bfs', 'astar', 'greedy']);
+      const snapshot = visualizer.getSnapshot();
+      expect(snapshot.runs.map(run => run.kind)).toEqual([
+        'search',
+        'search',
+        'search',
+      ]);
+      expect(
+        snapshot.runs.map(run => run.kind === 'search' && run.algorithm)
+      ).toEqual(['bfs', 'astar', 'greedy']);
+      // One timeline, long enough for the slowest racer.
+      const longest = Math.max(...snapshot.runs.map(run => run.length));
+      expect(visualizer.player.getState().length).toBe(
+        longest + Math.ceil(100 * 0.35)
+      );
+    });
+
+    it('rejects too few, too many, or repeated racers', () => {
+      const { visualizer } = create();
+      expect(() => visualizer.race([])).toThrow(RangeError);
+      expect(() =>
+        visualizer.race(['bfs', 'dfs', 'greedy', 'dijkstra', 'astar'])
+      ).toThrow(RangeError);
+      expect(() => visualizer.race(['bfs', 'bfs'])).toThrow(RangeError);
+    });
+
+    it('re-runs every racer live when the board is edited', () => {
+      const { visualizer } = create();
+      visualizer.race(['dijkstra', 'dfs']);
+      visualizer.beginGesture(at(2, 3), 'wall');
+      visualizer.endGesture();
+      const { grid, runs } = visualizer.getSnapshot();
+      expect(runs).toHaveLength(2);
+      for (const run of runs) {
+        if (run.kind !== 'search') throw new Error('expected searches');
+        const fresh = runSearch(
+          { grid, start: START, goal: GOAL },
+          run.algorithm
+        );
+        expect(run.result).toEqual(fresh.result);
+      }
+    });
+  });
+
+  describe('bestCost', () => {
+    it('is the lowest possible path cost whenever searches are shown', () => {
+      const { visualizer } = create();
+      expect(visualizer.getSnapshot().bestCost).toBeNull();
+      visualizer.beginGesture(at(2, 3), 'weight');
+      visualizer.endGesture();
+      visualizer.visualize('bfs'); // BFS walks through the weight...
+      const { runs, bestCost } = visualizer.getSnapshot();
+      const bfs = runs[0];
+      if (bfs.kind !== 'search') throw new Error('expected a search');
+      // ...but a detour avoiding it is cheaper.
+      expect(bestCost).toBe(6);
+      expect(bfs.result.cost).toBe(8);
+      visualizer.resetPath();
+      expect(visualizer.getSnapshot().bestCost).toBeNull();
+    });
+
+    it('is Infinity when the goal is unreachable', () => {
+      const { visualizer } = create();
+      for (const cell of [at(1, 5), at(3, 5), at(2, 4), at(2, 6)]) {
+        visualizer.beginGesture(cell, 'wall');
+        visualizer.endGesture();
+      }
+      visualizer.visualize('astar');
+      expect(visualizer.getSnapshot().bestCost).toBe(Infinity);
+    });
+  });
+
+  describe('board import/export', () => {
+    it('round-trips a board through exportBoard and the constructor', () => {
+      const { visualizer } = create();
+      visualizer.buildMaze('prims', seededRandom(9));
+      visualizer.beginGesture(at(0, 0), 'weight');
+      visualizer.endGesture();
+      const board = visualizer.exportBoard();
+      const copy = new Visualizer({ ...board, clock: new FakeClock() });
+      expect(copy.exportBoard()).toEqual(board);
+      // Exported arrays are copies.
+      board.walls.fill(1);
+      expect(visualizer.getSnapshot().grid.walls.some(w => w === 0)).toBe(true);
+    });
+
+    it('rejects wrongly sized or invalid initial cells, and clears the markers', () => {
+      const base = {
+        rows: 2,
+        columns: 2,
+        start: 0,
+        goal: 3,
+        clock: new FakeClock(),
+      };
+      expect(
+        () => new Visualizer({ ...base, walls: new Uint8Array(3) })
+      ).toThrow(RangeError);
+      expect(
+        () => new Visualizer({ ...base, weights: new Uint8Array(4) })
+      ).toThrow(RangeError);
+      const visualizer = new Visualizer({
+        ...base,
+        walls: Uint8Array.of(1, 1, 0, 1),
+        weights: Uint8Array.of(5, 1, 5, 5),
+      });
+      expect(visualizer.cellKind(0)).toBe('start');
+      expect(visualizer.cellKind(3)).toBe('goal');
+      expect(visualizer.cellKind(1)).toBe('wall');
+      expect(visualizer.cellKind(2)).toBe('weight');
+      expect(visualizer.getSnapshot().grid.weights[0]).toBe(1);
+    });
+  });
+});
+
+describe('sharing a board', () => {
+  it('survives a share link round trip exactly, weights included', () => {
+    const { visualizer } = create();
+    visualizer.buildMaze('recursive-division', seededRandom(4));
+    const empty = Array.from(
+      { length: ROWS * COLUMNS },
+      (_, cell) => cell
+    ).find(cell => visualizer.cellKind(cell) === 'empty')!;
+    visualizer.beginGesture(empty, 'weight');
+    visualizer.endGesture();
+    const board = visualizer.exportBoard();
+    const decoded = decodeShare(
+      encodeShare({ board, mode: 'race', algorithms: ['bfs', 'astar'] })
+    );
+    if (!decoded.ok) throw new Error(decoded.error);
+    // The codec stores "weighted" as one bit; decoding must restore the
+    // app's weighted-terrain cost, not some other value.
+    expect(decoded.state.board.weights[empty]).toBe(WEIGHTED_TERRAIN_COST);
+    const copy = new Visualizer({
+      ...decoded.state.board,
+      clock: new FakeClock(),
+    });
+    expect(copy.exportBoard()).toEqual(board);
   });
 });

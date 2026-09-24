@@ -113,3 +113,22 @@ export function entranceProgress(
 export function discoveredAt(run: SearchRun, tick: number): number {
   return Math.max(0, Math.min(run.discoveries, Math.ceil(tick)));
 }
+
+/**
+ * Which part of a search run is playing at `tick`:
+ * - `explore`: cells are still being discovered;
+ * - `path`: the found path is being traced;
+ * - `found` / `unreachable`: the run has finished.
+ */
+export type RunPhase = 'explore' | 'path' | 'found' | 'unreachable';
+
+export function runPhase(run: SearchRun, tick: number): RunPhase {
+  if (tick < run.discoveries) return 'explore';
+  if (!run.result.path) return 'unreachable';
+  return tick < run.length ? 'path' : 'found';
+}
+
+/** Whether the search itself has finished by `tick` (tracing the path is just the replay). */
+export function searchFinished(run: SearchRun, tick: number): boolean {
+  return tick >= run.discoveries;
+}
