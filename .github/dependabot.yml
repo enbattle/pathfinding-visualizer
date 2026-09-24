@@ -1,0 +1,69 @@
+# Weekly dependency updates, grouped so they arrive as a few reviewable PRs rather than one per
+# package. Each PR runs the full CI (unit, e2e, bundle budget, audit), which is what makes merging
+# them low-risk. Security updates are separate and immediate (enable "Dependabot security updates"
+# in the repo's Settings > Code security).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      ui:
+        patterns:
+          [
+            'radix-ui',
+            'lucide-react',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+            'tailwindcss',
+            '@tailwindcss/*',
+            'tw-animate-css',
+          ]
+      three:
+        patterns: ['three', '@types/three']
+      build-and-test:
+        patterns:
+          [
+            'vite',
+            '@vitejs/*',
+            'vitest',
+            '@playwright/test',
+            'jsdom',
+            '@testing-library/*',
+            'fast-check',
+          ]
+      lint-and-types:
+        patterns:
+          [
+            'eslint',
+            '@eslint/*',
+            'eslint-plugin-*',
+            'typescript',
+            'typescript-eslint',
+            'globals',
+            'prettier',
+            'prettier-plugin-*',
+            '@types/node',
+          ]
+    ignore:
+      # typescript-eslint currently requires TypeScript <6.1 (its peer range); lift this when a
+      # typescript-eslint release widens it.
+      - dependency-name: typescript
+        versions: ['>=6.1']
+      # Node's types track the runtime CI uses (.nvmrc: 22); bump both together, by hand.
+      - dependency-name: '@types/node'
+        versions: ['>=23']
+
+  # Keeps the SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

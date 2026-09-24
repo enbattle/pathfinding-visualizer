@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`search snapshots > astar 1`] = `
+"
+...******
+.S**#...*
+.ooo#.~~*
+.####.~~*
+......~~G
+.........
+cost 12, 13 cells, expanded 15
+"
+`;
+
+exports[`search snapshots > bfs 1`] = `
+"
+o********
+oSoo#ooo*
+oooo#ooo*
+o####ooo*
+ooooooooG
+ooooooo..
+cost 12, 13 cells, expanded 45
+"
+`;
+
+exports[`search snapshots > dfs 1`] = `
+"
+.........
+*S..#....
+*...#.~~.
+*####.~~.
+*.....~~G
+*********
+cost 14, 15 cells, expanded 14
+"
+`;
+
+exports[`search snapshots > dijkstra 1`] = `
+"
+ooo*****o
+oS**#oo**
+oooo#oo~*
+o####o~~*
+oooooo~~G
+oooooooo.
+cost 12, 13 cells, expanded 41
+"
+`;
+
+exports[`search snapshots > greedy 1`] = `
+"
+...***...
+.S**#**..
+..oo#.**.
+.####.~**
+......~~G
+.........
+cost 24, 13 cells, expanded 14
+"
+`;

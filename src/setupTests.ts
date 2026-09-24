@@ -10,7 +10,7 @@ import '@testing-library/jest-dom/vitest';
 // jsdom doesn't implement ResizeObserver at all. Radix's Slider (used for
 // Animation Speed) reads its thumb size via @radix-ui/react-use-size, which
 // calls `new ResizeObserver(...)` unconditionally on mount - without this
-// stub every test that renders <Configuration /> fails before any
+// stub every test that renders the app (<Workspace />) fails before any
 // assertion runs, since ResizeObserver is undefined in jsdom.
 class ResizeObserverStub {
   observe(): void {}
@@ -19,5 +19,16 @@ class ResizeObserverStub {
 }
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
-  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+  globalThis.ResizeObserver =
+    ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
+// jsdom has no 2D canvas; getContext() would log a "not implemented" error
+// on every render. The board renderer skips drawing without a context, and
+// its drawing code is tested against a recording fake instead
+// (board-renderer.test.ts).
+// (Guarded: benchmarks share this setup but run in plain Node, no DOM.)
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() =>
+    null) as unknown as HTMLCanvasElement['getContext'];
 }

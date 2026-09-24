@@ -1,19 +1,29 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 :root {
-  /* Board/algorithm colors - functional, referenced by the legend and by
-     src/algorithms/paths.tsx's animation classes; independent of the app
-     theme below. */
-  --board-fill-initial-color: beige;
-  --board-fill-intermediate-color: mediumaquamarine;
-  --board-fill-final-color: aquamarine;
-  --goal-path-initial-color: red;
-  --goal-path-intermediate-color: orange;
-  --goal-path-final-color: yellow;
-  --wall-color: #483c32;
-  --weight-color: #b8860b;
-  --anchor-color: gold;
+  /* Board colors, read by the canvas renderer (src/components/
+     board-renderer.ts, readPalette) and by the legend swatches below. Hex
+     values only: the renderer blends between them for entrance
+     animations. */
+  --board-grid-line: #0a0d13;
+  --board-empty: #161b26;
+  --board-wall: #c7d2e0;
+  --board-weight: #3d2e16;
+  --board-weight-mark: #f59e0b;
+  --board-start: #22c55e;
+  --board-goal: #f43f5e;
+  --board-anchor-text: #05080d;
+  /* Visited cells flash in, then settle on a ramp from near (discovered
+     first) to far (discovered last), which shows the search's wavefront. */
+  --board-visited-flash: #e0f2fe;
+  --board-visited-near: #22d3ee;
+  --board-visited-far: #6366f1;
+  --board-path-flash: #fff7ed;
+  --board-path: #fbbf24;
+  --board-path-line: #fffbeb;
+  --board-path-glow: #fbbf24;
+  --board-cursor: #f8fafc;
 
   /* App theme - neutral dark surfaces with a single cyan accent, registered
      below as Tailwind color utilities (bg-background, text-foreground, etc.)
@@ -67,17 +77,20 @@
 body {
   margin: 0;
   font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
   background-color: var(--background);
   background-image:
-    radial-gradient(circle at 12% 8%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 45%),
-    radial-gradient(circle at 88% 92%, color-mix(in oklch, var(--primary) 9%, transparent), transparent 50%);
+    radial-gradient(
+      circle at 12% 8%,
+      color-mix(in oklch, var(--primary) 14%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 88% 92%,
+      color-mix(in oklch, var(--primary) 9%, transparent),
+      transparent 50%
+    );
   background-attachment: fixed;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
@@ -86,251 +99,11 @@ body {
 
 code {
   font-family:
-    source-code-pro,
-    Menlo,
-    Monaco,
-    Consolas,
-    'Courier New',
-    monospace;
+    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/*
- * Themed scrollbar for the board's scroll container (configurations.tsx) -
- * the board is sized to fit its container exactly (see boardAreaRef's
- * ResizeObserver there), so this should rarely engage, but a very small
- * viewport can still force it. A default OS scrollbar here would look out
- * of place against the rest of the redesigned surface.
- */
-.board-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.board-scroll::-webkit-scrollbar {
-  width: 0.625rem;
-  height: 0.625rem;
-}
-
-.board-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.board-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--border);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.board-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
-  background-clip: padding-box;
-}
-
-/*
- * Board/maze styles. Fixed width/height (border-box, so border+padding sit
- * inside them) keep every cell identically sized regardless of content -
- * without this, a <td> containing text (the "S"/"G" anchor glyphs) sizes
- * itself, and its whole table row/column, from that content instead of
- * matching its empty siblings. Pair with table-fixed on the <table> so
- * column widths can't grow from content either.
- */
-@utility board-cell {
-  box-sizing: border-box;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 2px solid black;
-  padding: 0.25rem;
-  border-radius: 0.5rem;
-  vertical-align: middle;
-}
-
-/*
- * Start and goal cells share identical styling. font-size/line-height are
- * set explicitly (rather than left at the body default) because the "S"/"G"
- * glyph is the only board-cell content with actual text - left unconstrained,
- * its default line-height exceeds board-cell's fixed content box and grows
- * that table row taller than every sibling row, even with box-sizing:
- * border-box on the cell itself.
- */
-@utility board-cell-anchor {
-  font-weight: bold;
-  font-size: 0.75rem;
-  line-height: 1;
-  border-radius: 0.75rem;
-  box-shadow:
-    0.5rem 0.5rem 1rem 0 goldenrod inset,
-    -1rem -1rem 1rem 0 gold inset;
-}
-
-/*
- * The following classes are applied directly to board cell DOM nodes by
- * src/algorithms/paths.tsx (search visualization) outside of React's
- * render cycle - their names are load-bearing string literals over there
- * and must not be renamed here.
- */
-.vertical-path {
-  background: linear-gradient(
-    90deg,
-    var(--goal-path-final-color) 0%,
-    var(--goal-path-final-color) 33.3%,
-    black 33.3%,
-    black 66.6%,
-    var(--goal-path-final-color) 66.6%,
-    var(--goal-path-final-color) 100%
-  );
-}
-
-.horizontal-path {
-  background: linear-gradient(
-    180deg,
-    var(--goal-path-final-color) 0%,
-    var(--goal-path-final-color) 33.3%,
-    black 33.3%,
-    black 66.6%,
-    var(--goal-path-final-color) 66.6%,
-    var(--goal-path-final-color) 100%
-  );
-}
-
-.right-to-up-path {
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      transparent 66.6%,
-      var(--goal-path-final-color) 66.6%,
-      var(--goal-path-final-color) 100%
-    ),
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 66.6%,
-      var(--goal-path-final-color) 66.6%,
-      var(--goal-path-final-color) 100%
-    ),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
-}
-
-.left-to-up-path {
-  background:
-    linear-gradient(90deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 66.6%,
-      var(--goal-path-final-color) 66.6%,
-      var(--goal-path-final-color) 100%
-    ),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
-}
-
-.right-to-down-path {
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      transparent 66.6%,
-      var(--goal-path-final-color) 66.6%,
-      var(--goal-path-final-color) 100%
-    ),
-    linear-gradient(180deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
-}
-
-.left-to-down-path {
-  background:
-    linear-gradient(90deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(180deg, var(--goal-path-final-color) 0%, var(--goal-path-final-color) 33.3%, transparent 33.3%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, transparent 33.3%, black 33.3%, black 66.6%, transparent 66.6%, transparent 100%);
-}
-
-@keyframes boardfill {
-  0% {
-    scale: 0.3;
-    background-color: var(--board-fill-initial-color);
-    border-radius: 100%;
-  }
-  50% {
-    background-color: var(--board-fill-intermediate-color);
-  }
-  100% {
-    scale: 1;
-    background-color: var(--board-fill-final-color);
-    font-weight: bolder;
-    font-size: large;
-  }
-}
-
-@keyframes goalfill {
-  0% {
-    scale: 0.3;
-    background-color: var(--goal-path-initial-color);
-    border-radius: 100%;
-  }
-  50% {
-    background-color: var(--goal-path-intermediate-color);
-  }
-  100% {
-    scale: 1;
-    background-color: var(--goal-path-final-color);
-  }
-}
-
-@keyframes wallfill {
-  0% {
-    scale: 0.3;
-    background-color: var(--wall-color);
-    border-radius: 100%;
-  }
-  50% {
-    background-color: var(--wall-color);
-  }
-  100% {
-    scale: 1;
-    background-color: var(--wall-color);
-  }
-}
-
-.board-fill,
-.goal-path-fill,
-.wall-fill {
-  animation-duration: 0.25s;
-  animation-timing-function: ease-out;
-  animation-direction: alternate;
-  animation-iteration-count: 1;
-  animation-fill-mode: forwards;
-  animation-play-state: running;
-}
-
-.board-fill {
-  animation-name: boardfill;
-}
-
-.goal-path-fill {
-  animation-name: goalfill;
-}
-
-.wall-fill {
-  animation-name: wallfill;
-}
-
-/*
- * Weighted-terrain cells (higher traversal cost for Dijkstra, A-star, and
- * Greedy Best-first) - distinct from both the wall color and every
- * search-animation color so a cell's state is always unambiguous at a
- * glance.
- */
-@utility weight-fill {
-  background-color: var(--weight-color);
-}
-
-/* Legend swatches (src/components/configurations.tsx) - small static color
-   keys, independent of the animated board-cell classes above. */
+/* Legend swatches (src/components/board-area.tsx): static color keys
+   for the board colors above. */
 @utility legend-swatch {
   display: inline-block;
   width: 0.85rem;
@@ -339,22 +112,49 @@ code {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-@utility legend-swatch-anchor {
-  background-color: var(--anchor-color);
+@utility legend-swatch-start {
+  background-color: var(--board-start);
+}
+
+@utility legend-swatch-goal {
+  background-color: var(--board-goal);
 }
 
 @utility legend-swatch-wall {
-  background-color: var(--wall-color);
+  background-color: var(--board-wall);
 }
 
 @utility legend-swatch-weight {
-  background-color: var(--weight-color);
+  background-color: var(--board-weight);
+  background-image: radial-gradient(
+    circle,
+    var(--board-weight-mark) 0 28%,
+    transparent 30%
+  );
 }
 
 @utility legend-swatch-visited {
-  background-color: var(--board-fill-final-color);
+  background-image: linear-gradient(
+    90deg,
+    var(--board-visited-near),
+    var(--board-visited-far)
+  );
 }
 
 @utility legend-swatch-path {
-  background-color: var(--goal-path-final-color);
+  background-color: var(--board-path);
+}
+
+/* With reduced motion requested, skip UI animations and transitions (dialog
+   and menu zoom/fade from tw-animate-css, button transitions). The boards
+   handle it themselves (see use-reduced-motion.ts). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
