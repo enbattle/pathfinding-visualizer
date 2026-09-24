@@ -9,11 +9,7 @@ import {
 	speedToStepDelay,
 	DEFAULT_SPEED,
 } from "./configurations-helpers";
-import { AiFillInfoCircle } from 'react-icons/ai';
-import { TbMoodCrazyHappy } from 'react-icons/tb';
-import { GiBrickWall, GiPathDistance, GiStairsGoal } from 'react-icons/gi';
-import { BiRefresh } from 'react-icons/bi';
-import { LuGrid3X3 } from 'react-icons/lu';
+import { BrickWallIcon, FlagIcon, Grid3x3Icon, InfoIcon, LaughIcon, RotateCcwIcon, RouteIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,7 +112,7 @@ const Configuration = () => {
 							aria-label="About this app"
 							onClick={() => { setOpenInfoModal(true); }}
 						>
-							<AiFillInfoCircle className="h-5 w-5" />
+							<InfoIcon className="h-5 w-5" />
 						</Button>
 					</div>
 
@@ -134,17 +130,17 @@ const Configuration = () => {
 				<Dialog open={openInfoModal} onOpenChange={setOpenInfoModal}>
 					<DialogContent aria-describedby="pathfinding-modal-description">
 						<DialogTitle>
-							Welcome to Pathfinding Visualizer! <TbMoodCrazyHappy className="inline h-6 w-6 align-text-bottom text-primary" />
+							Welcome to Pathfinding Visualizer! <LaughIcon className="inline h-6 w-6 align-text-bottom text-primary" />
 						</DialogTitle>
 						<div id="pathfinding-modal-description">
 							<div>You can choose wall-building and path-finding algorithms and see them in action!</div>
 							<div>Here is a list of options to help you get started:</div>
 							<ul className="list-disc space-y-1 pl-5">
-								<li>To see the wall creation, please select a wall algorithm from the dropdown and click on the "Build Walls" button. <GiBrickWall className="inline h-6 w-6 align-text-bottom text-primary" /></li>
-								<li>To see the finding of paths, please select a path algorithm from the dropdown and click on the "Visualize" button. <GiPathDistance className="inline h-6 w-6 align-text-bottom text-primary" /></li>
-								<li>To reset the start and goal coordinates, click on the "Reset Start/Goal" button. <GiStairsGoal className="inline h-6 w-6 align-text-bottom text-primary" /></li>
-								<li>To reset the current path visualized, click on the "Reset Path" button. <BiRefresh className="inline h-6 w-6 align-text-bottom text-primary" /></li>
-								<li>To reset the the board, click on the "Reset All" button. <BiRefresh className="inline h-6 w-6 align-text-bottom text-primary" /></li>
+								<li>To see the wall creation, please select a wall algorithm from the dropdown and click on the "Build Walls" button. <BrickWallIcon className="inline h-6 w-6 align-text-bottom text-primary" /></li>
+								<li>To see the finding of paths, please select a path algorithm from the dropdown and click on the "Visualize" button. <RouteIcon className="inline h-6 w-6 align-text-bottom text-primary" /></li>
+								<li>To reset the start and goal coordinates, click on the "Reset Start/Goal" button. <FlagIcon className="inline h-6 w-6 align-text-bottom text-primary" /></li>
+								<li>To reset the current path visualized, click on the "Reset Path" button. <RotateCcwIcon className="inline h-6 w-6 align-text-bottom text-primary" /></li>
+								<li>To reset the the board, click on the "Reset All" button. <RotateCcwIcon className="inline h-6 w-6 align-text-bottom text-primary" /></li>
 								<li>Drag the Start or Goal marker to move it anywhere on the board.</li>
 								<li>Click, or click-and-drag, an empty cell to paint a wall or weighted terrain, depending on the paint mode selected below the wall algorithm.</li>
 							</ul>
@@ -169,7 +165,7 @@ const Configuration = () => {
 							</SelectContent>
 						</Select>
 						<Button type="button" className="mt-1" onClick={() => setShouldBuildWalls(true)}>
-							<GiBrickWall /> Build Walls
+							<BrickWallIcon /> Build Walls
 						</Button>
 					</div>
 
@@ -237,7 +233,7 @@ const Configuration = () => {
 							</SelectContent>
 						</Select>
 						<Button type="button" className="mt-1" onClick={() => setShouldVisualizePathAlgorithm(true)}>
-							<GiPathDistance /> Visualize
+							<RouteIcon /> Visualize
 						</Button>
 					</div>
 
@@ -290,7 +286,7 @@ const Configuration = () => {
 			<Card className="min-w-0 min-h-[28rem] flex-1 gap-0 self-stretch overflow-hidden py-0">
 				<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border px-5 py-4">
 					<div className="flex items-center gap-2">
-						<LuGrid3X3 className="h-4 w-4 text-muted-foreground" />
+						<Grid3x3Icon className="h-4 w-4 text-muted-foreground" />
 						<CardTitle className="text-base">Board</CardTitle>
 					</div>
 					<Badge variant="outline" className="font-normal text-muted-foreground">

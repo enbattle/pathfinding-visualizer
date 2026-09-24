@@ -1,9 +1,16 @@
 {
-  "short_name": "Pathfinding Visualizer",
-  "name": "Pathfinding Visualizer App",
-  "icons": [],
+  "short_name": "Pathfinding",
+  "name": "Pathfinding Visualizer",
+  "description": "Interactive visualizer for pathfinding and maze-generation algorithms.",
+  "icons": [
+    {
+      "src": "slime-icon.png",
+      "sizes": "500x500",
+      "type": "image/png"
+    }
+  ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#0b0e14",
+  "background_color": "#0b0e14"
 }

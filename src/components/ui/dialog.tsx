@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { AiOutlineClose } from 'react-icons/ai';
+import { XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Dialog = DialogPrimitive.Root;
@@ -35,7 +35,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
       >
         {children}
         <DialogPrimitive.Close className="absolute top-4 right-4 cursor-pointer text-muted-foreground hover:text-foreground">
-          <AiOutlineClose className="h-5 w-5" />
+          <XIcon className="h-5 w-5" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
