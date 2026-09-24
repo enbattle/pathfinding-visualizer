@@ -5,10 +5,9 @@ export interface Coordinate {
   column: number;
 }
 
-// Computes the board size (rows/columns) from the current viewport.
-// 28px matches board-cell's fixed size in index.css (1.75rem, border-box) -
-// keep these in sync so the computed grid actually fills the viewport
-// instead of leaving a gap or overflowing.
+// Target cell size when choosing how many rows/columns a new board gets
+// from the space available. Only the initial grid size uses it: the canvas
+// then scales cells to fit its container (BoardCanvas's fitCellSize).
 export const CELL_SIZE_PX = 28;
 
 // Shared floor-at-20 math, factored out so it can be applied either to the
@@ -66,12 +65,13 @@ export function randomGoalCoordinate(
   };
 }
 
-// Higher slider value = faster animation, so the step delay it maps to
-// (what the algorithms actually use) runs the other way: a bigger slider
-// value means a smaller delay-per-step.
+// The speed slider (0-100) maps to milliseconds per animation step, and
+// from that to the Player's rate (steps per second, speedToRate): higher
+// speed, shorter step. The range (2-40 ms per step, 25-500 steps/s) matches
+// the original timer-driven app, so the default feels the same.
 export const MIN_STEP_DELAY = 2;
 export const MAX_STEP_DELAY = 40;
-export const DEFAULT_SPEED = 80; // 0-100 slider position; 80 maps close to the original hardcoded 10ms step
+export const DEFAULT_SPEED = 80; // ~10 ms per step (100 steps/s), the original default
 
 export function speedToStepDelay(speed: number): number {
   const t = 1 - speed / 100;

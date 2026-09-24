@@ -1,5 +1,6 @@
 import React from 'react';
 import { BoxIcon, SquareIcon } from 'lucide-react';
+import { WEIGHTED_TERRAIN_COST } from '../engine';
 import { runPhase, type SearchRun } from '../visualizer/runs';
 import type { PaintMode, Visualizer } from '../visualizer/visualizer';
 import { algorithmLabel } from './algorithm-guides';
@@ -7,12 +8,10 @@ import { BoardCanvas } from './board-canvas';
 import { PlaybackControls } from './playback-controls';
 import { Segmented } from './segmented';
 import { ErrorBoundary } from './error-boundary';
+import { load3DView } from './board-3d/load';
 import { Button } from '@/components/ui/button';
 import { usePlayerState, useVisualizerSnapshot } from './use-visualizer';
 import { cn } from '@/lib/utils';
-
-// three.js is only downloaded when someone switches to the 3D view.
-const Board3D = React.lazy(() => import('./board-3d/board-3d'));
 
 export type BoardView = '2d' | '3d';
 
@@ -20,7 +19,10 @@ const LEGEND_ITEMS: { label: string; swatchClassName: string }[] = [
   { label: 'Start', swatchClassName: 'legend-swatch-start' },
   { label: 'Goal', swatchClassName: 'legend-swatch-goal' },
   { label: 'Wall', swatchClassName: 'legend-swatch-wall' },
-  { label: 'Weighted (cost 5)', swatchClassName: 'legend-swatch-weight' },
+  {
+    label: `Weighted (cost ${WEIGHTED_TERRAIN_COST})`,
+    swatchClassName: 'legend-swatch-weight',
+  },
   { label: 'Visited, early → late', swatchClassName: 'legend-swatch-visited' },
   { label: 'Path', swatchClassName: 'legend-swatch-path' },
 ];
@@ -69,6 +71,15 @@ interface BoardAreaProps {
 export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
   const snapshot = useVisualizerSnapshot(visualizer);
   const [view, setView] = React.useState<BoardView>('2d');
+  // three.js is only downloaded when someone switches to the 3D view. A
+  // fresh lazy component per attempt: React.lazy caches a failed import, so
+  // retrying the same one after a failed download would fail again.
+  const [loadAttempt, setLoadAttempt] = React.useState(0);
+  const Board3D = React.useMemo(
+    () => React.lazy(load3DView),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new attempt is the point
+    [loadAttempt]
+  );
   const searches = snapshot.runs.filter(
     (run): run is SearchRun => run.kind === 'search'
   );
@@ -81,7 +92,7 @@ export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
         <p className="text-xs text-muted-foreground">
           {view === '2d'
             ? 'Click or drag to paint · drag S or G to move them'
-            : 'Drag to orbit · scroll to zoom · switch to 2D to edit'}
+            : 'Drag to orbit · scroll to zoom · arrow keys pan · switch to 2D to edit'}
         </p>
         <Segmented
           label="View"
@@ -144,7 +155,10 @@ export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={retry}
+                          onClick={() => {
+                            setLoadAttempt(attempt => attempt + 1);
+                            retry();
+                          }}
                         >
                           Try again
                         </Button>

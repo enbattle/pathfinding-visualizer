@@ -8,6 +8,7 @@ import {
 } from '../visualizer/visualizer';
 import { drawBoard, readPalette, type BoardPalette } from './board-renderer';
 import { CELL_SIZE_PX } from './board-setup';
+import { cellsBetween } from './board-geometry';
 import { usePrefersReducedMotion } from './use-reduced-motion';
 
 interface BoardCanvasProps {
@@ -169,9 +170,13 @@ export function BoardCanvas({
         kind === 'start' || kind === 'goal' ? 'grab' : 'pointer';
       return;
     }
-    if (cell === null || cell === lastCellRef.current) return;
+    const last = lastCellRef.current;
+    if (cell === null || cell === last) return;
     lastCellRef.current = cell;
-    visualizer.continueGesture(cell);
+    // Fill in every cell between the previous event and this one, so a fast
+    // drag paints an unbroken stroke.
+    const stroke = last === null ? [cell] : cellsBetween(last, cell, columns);
+    for (const next of stroke) visualizer.continueGesture(next);
   };
 
   const endPointerGesture = () => {

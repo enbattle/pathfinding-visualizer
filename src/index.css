@@ -144,3 +144,17 @@ code {
 @utility legend-swatch-path {
   background-color: var(--board-path);
 }
+
+/* With reduced motion requested, skip UI animations and transitions (dialog
+   and menu zoom/fade from tw-animate-css, button transitions). The boards
+   handle it themselves (see use-reduced-motion.ts). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

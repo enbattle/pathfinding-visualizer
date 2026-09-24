@@ -381,11 +381,14 @@ const Workspace = ({
           )}
 
           {visualizer && (
-            <Results
-              visualizer={visualizer}
-              mode={mode}
-              pathAlgorithm={pathAlgorithm}
-            />
+            <>
+              <StaleLinkCleaner visualizer={visualizer} />
+              <Results
+                visualizer={visualizer}
+                mode={mode}
+                pathAlgorithm={pathAlgorithm}
+              />
+            </>
           )}
 
           <Separator />
@@ -498,6 +501,34 @@ const Workspace = ({
 
 // Results for whatever is on screen, the no-path error, and (in explore
 // mode, before any run) the selected algorithm's walkthrough.
+// Once the board is edited, a share link still in the address bar (from
+// opening one, or from Share) no longer describes what's on screen:
+// reloading would bring back the old board and drop the edits. So drop the
+// fragment as soon as the board changes. Runs don't count - replaying the
+// link's own run leaves it valid.
+function StaleLinkCleaner({ visualizer }: { visualizer: Visualizer }) {
+  const { boardRevision } = useVisualizerSnapshot(visualizer);
+  // The revision the current board started at. A new visualizer (e.g. from a
+  // pasted link) starts a new baseline - adjusted during render, React's
+  // pattern for state derived from a changed prop.
+  const [baseline, setBaseline] = React.useState({
+    visualizer,
+    revision: boardRevision,
+  });
+  if (baseline.visualizer !== visualizer) {
+    setBaseline({ visualizer, revision: boardRevision });
+  }
+  const edited =
+    baseline.visualizer === visualizer && boardRevision !== baseline.revision;
+  React.useEffect(() => {
+    if (edited && window.location.hash) {
+      const { pathname, search } = window.location;
+      window.history.replaceState(null, '', pathname + search);
+    }
+  }, [edited, boardRevision]);
+  return null;
+}
+
 function Results({
   visualizer,
   mode,

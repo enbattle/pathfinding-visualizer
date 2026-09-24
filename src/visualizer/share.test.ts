@@ -69,12 +69,12 @@ function rawBoardBytes(rows: number, columns: number): number[] {
   ];
 }
 
-// Arbitrary valid state: sizes 2..40, random walls/weights, never on
+// Arbitrary valid state: sizes 5..40, random walls/weights, never on
 // start/goal, never both on one cell.
 const stateArbitrary: fc.Arbitrary<SharedState> = fc
   .record({
-    rows: fc.integer({ min: 2, max: 40 }),
-    columns: fc.integer({ min: 2, max: 40 }),
+    rows: fc.integer({ min: 5, max: 40 }),
+    columns: fc.integer({ min: 5, max: 40 }),
   })
   .chain(({ rows, columns }) => {
     const size = rows * columns;
@@ -226,13 +226,13 @@ describe('share codec', () => {
   });
 
   it('accepts a leading # and ignores unknown params', () => {
-    const fragment = encodeShare(explore(board(3, 4)));
+    const fragment = encodeShare(explore(board(5, 5)));
     expect(decodeShare(`#${fragment}`).ok).toBe(true);
     expect(decodeShare(`${fragment}&utm_source=x&zz=1`).ok).toBe(true);
   });
 
   it('defaults to explore with bfs when mode and algorithms are absent', () => {
-    const fragment = new URLSearchParams(encodeShare(explore(board(3, 4))));
+    const fragment = new URLSearchParams(encodeShare(explore(board(5, 5))));
     fragment.delete('m');
     fragment.delete('a');
     const result = decodeShare(fragment.toString());
@@ -256,18 +256,18 @@ describe('share codec', () => {
   });
 
   it('encodeShare throws RangeError on an invalid state', () => {
-    expect(() => encodeShare(explore(board(3, 4, { goal: 0 })))).toThrow(
+    expect(() => encodeShare(explore(board(5, 5, { goal: 0 })))).toThrow(
       RangeError
     );
     expect(() =>
-      encodeShare({ board: board(3, 4), mode: 'race', algorithms: ['bfs'] })
+      encodeShare({ board: board(5, 5), mode: 'race', algorithms: ['bfs'] })
     ).toThrow(RangeError);
     expect(() => encodeShare(explore(board(1, 4)))).toThrow(RangeError);
   });
 });
 
 describe('share codec rejects', () => {
-  const valid = () => new URLSearchParams(encodeShare(explore(board(3, 4))));
+  const valid = () => new URLSearchParams(encodeShare(explore(board(5, 5))));
   const withParam = (key: string, value: string) => {
     const params = valid();
     params.set(key, value);
@@ -281,7 +281,7 @@ describe('share codec rejects', () => {
 
   it('a wrong version (param or byte)', () => {
     expectError(withParam('v', '2'), /version/);
-    const bytes = rawBoardBytes(3, 4);
+    const bytes = rawBoardBytes(5, 5);
     bytes[0] = 2;
     expectError(rawFragment(bytes), /version/);
   });
@@ -296,21 +296,23 @@ describe('share codec rejects', () => {
   });
 
   it('truncated or extra bytes', () => {
-    expectError(rawFragment(rawBoardBytes(3, 4).slice(0, -1)), /size/);
-    expectError(rawFragment([...rawBoardBytes(3, 4), 0]), /size/);
+    expectError(rawFragment(rawBoardBytes(5, 5).slice(0, -1)), /size/);
+    expectError(rawFragment([...rawBoardBytes(5, 5), 0]), /size/);
     expectError(rawFragment([1, 0, 3]), /truncated/);
   });
 
   it('nonzero padding bits in a bitset', () => {
-    // 3x3 = 9 cells: the second bitset byte uses only bit 0.
-    const bytes = rawBoardBytes(3, 3);
-    bytes[13 + 1] = 0b10;
+    // 5x5 = 25 cells: each bitset's 4th byte uses only bit 0.
+    const bytes = rawBoardBytes(5, 5);
+    bytes[13 + 3] = 0b10;
     expectError(rawFragment(bytes), /stray bits/);
   });
 
   it('dimensions out of range', () => {
-    expectError(rawFragment(rawBoardBytes(1, 4)), /size/);
-    expectError(rawFragment(rawBoardBytes(201, 2)), /size/);
+    expectError(rawFragment(rawBoardBytes(1, 5)), /size/);
+    expectError(rawFragment(rawBoardBytes(4, 5)), /size/);
+    expectError(rawFragment(rawBoardBytes(5, 4)), /size/);
+    expectError(rawFragment(rawBoardBytes(201, 5)), /size/);
   });
 
   it('too many cells', () => {
@@ -318,21 +320,21 @@ describe('share codec rejects', () => {
   });
 
   it('start === goal', () => {
-    const bytes = rawBoardBytes(3, 4);
+    const bytes = rawBoardBytes(5, 5);
     bytes.splice(9, 4, 0, 0, 0, 0);
     expectError(rawFragment(bytes), /differ/);
   });
 
   it('start on a wall', () => {
-    const bytes = rawBoardBytes(3, 4);
+    const bytes = rawBoardBytes(5, 5);
     bytes[13] = 1; // wall on cell 0 = start
     expectError(rawFragment(bytes), /open/);
   });
 
   it('a cell that is both wall and weighted', () => {
-    const bytes = rawBoardBytes(3, 4);
+    const bytes = rawBoardBytes(5, 5);
     bytes[13] = 0b10; // wall on cell 1
-    bytes[15] = 0b10; // weight on cell 1 (3x4 = 12 cells -> 2-byte bitsets)
+    bytes[17] = 0b10; // weight on cell 1 (5x5 = 25 cells -> 4-byte bitsets)
     expectError(rawFragment(bytes), /both/);
   });
 

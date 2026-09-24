@@ -6,7 +6,11 @@ import {
   type MazeAlgorithmId,
   type PathAlgorithmId,
   type Random,
+  WEIGHTED_TERRAIN_COST,
 } from '../engine';
+
+// Re-exported for the UI and tests; defined in the engine (grid.ts).
+export { WEIGHTED_TERRAIN_COST };
 import { Player, type FrameClock } from '../player/player';
 import {
   createMazeRun,
@@ -17,9 +21,6 @@ import {
 
 /** Most algorithms a race can compare at once. */
 export const MAX_RACERS = 4;
-
-/** Traversal cost of a weighted-terrain cell (normal cells cost 1). */
-export const WEIGHTED_TERRAIN_COST = 5;
 
 /** How long a cell's entrance animation lasts, in seconds of playback. */
 export const ENTRANCE_SECONDS = 0.35;
@@ -48,6 +49,12 @@ export interface VisualizerSnapshot {
    */
   readonly bestCost: number | null;
   readonly error: string | null;
+  /**
+   * Bumped whenever the board itself (walls, weights, start/goal) changes -
+   * not when runs start or play. Lets the UI tell when a share link in the
+   * URL no longer describes what's on screen.
+   */
+  readonly boardRevision: number;
 }
 
 /** The runs in a snapshot that are searches (all of them, or none). */
@@ -108,8 +115,13 @@ export class Visualizer {
   private goal: number;
   private runs: readonly Run[] = [];
   private bestCost: number | null = null;
+  private boardRevision = 0;
   private error: string | null = null;
   private gesture: Gesture | null = null;
+  // While a marker is being dragged: the cell it is over and what that cell
+  // held before the marker arrived, restored when the marker moves on.
+  private covered: { index: number; wall: number; weight: number } | null =
+    null;
   private snapshot: VisualizerSnapshot;
   private readonly listeners = new Set<() => void>();
 
@@ -213,12 +225,16 @@ export class Visualizer {
       random
     );
     this.grid.walls.fill(0);
+    // The maze replaces every wall, so there is nothing to restore under a
+    // marker that happens to be mid-drag.
+    this.covered = null;
     for (const { index } of placements) {
       this.grid.walls[index] = 1;
       this.grid.weights[index] = 1;
     }
     this.error = null;
     this.bestCost = null;
+    this.boardRevision++;
     this.startRuns([createMazeRun(rows * columns, algorithm, placements)], {
       animate: true,
     });
@@ -242,7 +258,9 @@ export class Visualizer {
     }
     this.grid.walls.fill(0);
     this.grid.weights.fill(1);
+    this.boardRevision++;
     this.gesture = null;
+    this.covered = null;
     this.resetPath();
   }
 
@@ -282,7 +300,9 @@ export class Visualizer {
   }
 
   endGesture(): void {
+    // Dropping a marker commits it: the cell it covers stays plain.
     this.gesture = null;
+    this.covered = null;
   }
 
   get gestureInProgress(): boolean {
@@ -302,10 +322,21 @@ export class Visualizer {
     const kind = this.cellKind(index);
 
     if (gesture.kind === 'move') {
-      // A marker can land on any cell except the other marker; landing on a
-      // wall or weighted terrain clears it.
+      // A marker can move onto any cell except the other marker. It only
+      // covers the cell under it: passing over a wall or weighted terrain
+      // puts it back once the marker moves on, and only the cell it's
+      // finally dropped on is cleared.
       if (kind === 'start' || kind === 'goal') return;
       this.settleMaze();
+      if (this.covered) {
+        this.grid.walls[this.covered.index] = this.covered.wall;
+        this.grid.weights[this.covered.index] = this.covered.weight;
+      }
+      this.covered = {
+        index,
+        wall: this.grid.walls[index],
+        weight: this.grid.weights[index],
+      };
       this.grid.walls[index] = 0;
       this.grid.weights[index] = 1;
       if (gesture.anchor === 'start') this.start = index;
@@ -333,6 +364,7 @@ export class Visualizer {
   // After an edit, search results on screen would be stale - re-run them
   // instantly (no animation) so the paths follow the edit live.
   private afterEdit(): void {
+    this.boardRevision++;
     const algorithms = this.runs
       .filter((run): run is SearchRun => run.kind === 'search')
       .map(run => run.algorithm);
@@ -409,6 +441,7 @@ export class Visualizer {
       goal: this.goal,
       runs: this.runs,
       bestCost: this.bestCost,
+      boardRevision: this.boardRevision,
       error: this.error,
     };
   }

@@ -6,6 +6,7 @@ import {
   fixtureLink,
   FIXTURE,
   test,
+  THREE_D_TIMEOUT,
 } from './fixtures';
 
 const board = (page: import('@playwright/test').Page) =>
@@ -49,16 +50,18 @@ test('builds a maze, then finds a path through it', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Visualize' }).click();
   await finishPlayback(page);
-  const stats = page.getByRole('status', { name: 'Run statistics' });
+  const stats = page.getByRole('group', { name: 'Run statistics' });
   await expect(stats).toContainText('shortest');
-  await expect(page.getByText('Path found')).toBeVisible();
+  await expect(page.getByText('Path found', { exact: true })).toBeVisible();
 });
 
 test('a share link restores the board and replays its run', async ({
   page,
 }, testInfo) => {
   await page.goto(fixtureLink('explore', ['astar']));
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible(); // replaying
+  // The link starts its run: its playback controls appear. (Not checked via
+  // the Pause button - on this small board the replay can finish first.)
+  await expect(page.getByRole('group', { name: 'Playback' })).toBeVisible();
   await finishPlayback(page);
 
   await expectCellColor(page, FIXTURE.start, 'start');
@@ -67,7 +70,7 @@ test('a share link restores the board and replays its run', async ({
   // The only way around the wall is through the gap.
   await expectCellColor(page, FIXTURE.gap, 'path');
   await expect(
-    page.getByRole('status', { name: 'Run statistics' })
+    page.getByRole('group', { name: 'Run statistics' })
   ).toContainText('shortest');
   await testInfo.attach('shared board', {
     body: await page.screenshot(),
@@ -104,7 +107,7 @@ test('races three algorithms on one board', async ({ page }, testInfo) => {
   await expect(page.getByRole('application')).toHaveCount(3);
   await finishPlayback(page);
 
-  const standings = page.getByRole('status', { name: 'Race standings' });
+  const standings = page.getByRole('table', { name: 'Race standings' });
   await expect(standings.getByRole('row')).toHaveCount(4); // header + 3
   await expect(standings.getByLabel('First')).toBeVisible();
   // Every racer's path must squeeze through the gap.
@@ -133,7 +136,12 @@ test('the board can be painted with the keyboard', async ({ page }) => {
 
 test('the 3D view loads on demand, renders with WebGL, and survives toggling', async ({
   page,
+  context,
 }, testInfo) => {
+  // Deliberately heavy: 20+ full scene rebuilds in software WebGL, which on
+  // a shared CI runner with parallel workers can take well over the default
+  // 30 s per test.
+  test.setTimeout(120_000);
   await page.goto(fixtureLink('explore', ['dijkstra']));
   const chunk = page.waitForResponse(
     response => response.url().includes('board-3d') && response.ok()
@@ -142,22 +150,52 @@ test('the 3D view loads on demand, renders with WebGL, and survives toggling', a
   await chunk;
 
   const view = page.getByRole('img', { name: /in 3D/ });
-  await expect(view).toBeVisible();
+  await expect(view).toBeVisible({ timeout: THREE_D_TIMEOUT });
+
+  // More toggles than Chromium's ~16 live WebGL contexts: if disposing a
+  // scene leaked its context, the view would fail before the loop ends.
+  for (let i = 0; i < 20; i++) {
+    await page.getByRole('button', { name: '2D' }).click();
+    await page.getByRole('button', { name: '3D' }).click();
+    await expect(view).toBeVisible({ timeout: THREE_D_TIMEOUT });
+  }
   await expect(
     page.getByText(/needs WebGL|couldn't start|was lost/)
   ).toHaveCount(0);
-
-  for (let i = 0; i < 10; i++) {
-    await page.getByRole('button', { name: '2D' }).click();
-    await page.getByRole('button', { name: '3D' }).click();
-  }
-  await expect(view).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await finishPlayback(page);
-  await testInfo.attach('3D view', {
-    body: await page.screenshot(),
-    contentType: 'image/png',
-  });
+
+  // It really drew the scene: the screenshot has lit, shaded geometry (many
+  // distinct colors) including the green start pillar and the amber path.
+  // Decoded on a blank page - the app's CSP rightly blocks data: images.
+  const shot = await view.screenshot();
+  await testInfo.attach('3D view', { body: shot, contentType: 'image/png' });
+  const scratch = await context.newPage();
+  const colors = await scratch.evaluate(async base64 => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(image, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const distinct = new Set<number>();
+    let green = 0;
+    let amber = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+      distinct.add((r << 16) | (g << 8) | b);
+      if (g > 140 && r < 110 && b < 130) green++;
+      if (r > 190 && g > 140 && b < 110) amber++;
+    }
+    return { distinct: distinct.size, green, amber };
+  }, shot.toString('base64'));
+  await scratch.close();
+  expect(colors.distinct).toBeGreaterThan(200);
+  expect(colors.green).toBeGreaterThan(50);
+  expect(colors.amber).toBeGreaterThan(50);
 });
 
 test('a broken share link falls back to a fresh board', async ({

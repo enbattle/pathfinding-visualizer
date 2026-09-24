@@ -1,3 +1,4 @@
+import { WEIGHTED_TERRAIN_COST } from '../engine';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ const TIPS: { title: string; body: string }[] = [
   },
   {
     title: 'Edit the board',
-    body: 'Click or drag to paint walls or weighted terrain (entering it costs 5 instead of 1); start a drag on a painted cell to erase. Drag S or G to move them. Once a path is shown, edits update it live. Build Walls generates a maze.',
+    body: `Click or drag to paint walls or weighted terrain (entering it costs ${WEIGHTED_TERRAIN_COST} instead of 1); start a drag on a painted cell to erase. Drag S or G to move them - they pass over walls without erasing them. Once a path is shown, edits update it live. Build Walls generates a maze.`,
   },
   {
     title: 'Keyboard',

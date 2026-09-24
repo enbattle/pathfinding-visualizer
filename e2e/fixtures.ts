@@ -165,3 +165,11 @@ export async function finishPlayback(page: Page): Promise<void> {
     await expect(skip).toBeDisabled({ timeout: 1_000 });
   }).toPass({ timeout: 20_000 });
 }
+
+/**
+ * How long to wait for the 3D view to appear. Headless Chromium has no
+ * GPU, so WebGL runs in software (SwiftShader); with parallel workers on a
+ * shared CI runner, downloading the lazy chunk and starting the scene can
+ * exceed the default 5 s. (With a real GPU it takes a fraction of that.)
+ */
+export const THREE_D_TIMEOUT = 30_000;

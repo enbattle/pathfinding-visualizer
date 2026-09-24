@@ -11,6 +11,13 @@ export interface Grid {
   readonly weights: Uint8Array;
 }
 
+/**
+ * Entry cost of a weighted-terrain cell (normal cells cost 1). The one
+ * definition: the UI paints it, share links store "weighted" as one bit and
+ * decode back to it, and the legend and help text quote it.
+ */
+export const WEIGHTED_TERRAIN_COST = 5;
+
 export function createGrid(rows: number, columns: number): Grid {
   if (
     !Number.isInteger(rows) ||
@@ -35,14 +42,6 @@ export function toIndex(
   column: number
 ): number {
   return row * grid.columns + column;
-}
-
-export function rowOf(grid: Pick<Grid, 'columns'>, index: number): number {
-  return Math.floor(index / grid.columns);
-}
-
-export function columnOf(grid: Pick<Grid, 'columns'>, index: number): number {
-  return index % grid.columns;
 }
 
 /**

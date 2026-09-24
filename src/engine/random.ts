@@ -1,6 +1,7 @@
 // Randomness is always injected (never a bare Math.random call inside an
-// algorithm) so a maze can be reproduced exactly from a seed - in tests,
-// and later for shareable board URLs.
+// algorithm) so a maze can be reproduced exactly from a seed, e.g. in the
+// snapshot and property tests. (Share links store the board itself, not a
+// seed.)
 
 /** Returns a float in [0, 1), like Math.random. */
 export type Random = () => number;

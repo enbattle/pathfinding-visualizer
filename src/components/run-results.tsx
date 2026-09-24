@@ -70,6 +70,23 @@ function ShortestNote({
   );
 }
 
+// What the polite live region says for each phase - it only changes (and
+// so is only announced) when the phase does.
+function exploreAnnouncement(
+  run: SearchRun,
+  phase: RunPhase,
+  shortest: boolean | null
+): string {
+  const name = algorithmLabel(run.algorithm);
+  if (phase === 'explore') return `${name} is exploring.`;
+  if (phase === 'unreachable') return `${name} found no path.`;
+  if (phase === 'path') return `${name} found a path.`;
+  const cost = `Path found: ${run.result.path?.length} cells, cost ${formatCost(run.result.cost)}`;
+  return shortest === false
+    ? `${cost}, not the shortest.`
+    : `${cost}, the shortest possible.`;
+}
+
 /** Stats and a pseudocode walkthrough for the single search on screen. */
 export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
   const snapshot = useVisualizerSnapshot(visualizer);
@@ -80,8 +97,11 @@ export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* A plain labeled group, not a live region: "Nodes visited" changes
+          every animation frame, which would flood a screen reader. Phase
+          changes are announced once each, below. */}
       <div
-        role="status"
+        role="group"
         aria-label="Run statistics"
         className="grid grid-cols-2 gap-2"
       >
@@ -100,6 +120,9 @@ export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
         />
         <Stat label="Algorithm time" value={`${run.searchMs.toFixed(2)}ms`} />
       </div>
+      <p className="sr-only" aria-live="polite">
+        {exploreAnnouncement(run, runPhase(run, tick), shortest)}
+      </p>
       <HowItWorks algorithm={run.algorithm} phase={runPhase(run, tick)} />
     </div>
   );
@@ -186,13 +209,21 @@ export function RaceScoreboard({ visualizer }: { visualizer: Visualizer }) {
   const placeOf = (run: SearchRun) =>
     1 + finishers.filter(other => other.discoveries < run.discoveries).length;
 
+  // Announced once, when every racer has finished (not on every frame).
+  const allDone = runs.every(run => searchFinished(run, tick));
+  const winners = finishers.filter(run => placeOf(run) === 1);
+  const announcement = !allDone
+    ? 'Race in progress.'
+    : winners.length === 0
+      ? 'Race finished: no path exists.'
+      : `Race finished. First: ${winners.map(run => algorithmLabel(run.algorithm)).join(' and ')}.`;
+
   return (
-    <div
-      role="status"
-      aria-label="Race standings"
-      className="overflow-hidden rounded-lg border border-border/70"
-    >
-      <table className="w-full text-left text-xs">
+    <div className="overflow-hidden rounded-lg border border-border/70">
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
+      <table aria-label="Race standings" className="w-full text-left text-xs">
         <thead className="bg-background/60 text-[11px] tracking-wide text-muted-foreground uppercase">
           <tr>
             <th className="px-3 py-2 font-medium">Algorithm</th>

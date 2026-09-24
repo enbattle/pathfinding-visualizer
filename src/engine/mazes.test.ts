@@ -30,7 +30,8 @@ function render(problem: MazeProblem, placements: WallPlacement[]): string {
 // Locks in each algorithm's exact output for a fixed seed, so any change to
 // how mazes are generated shows up as a readable diff in review. (Output
 // was proven identical to the pre-engine implementation before that code
-// was removed - see the git history of src/algorithms/walls.tsx.) Only
+// was removed: commit "Remove the pre-engine algorithms and document the
+// architecture" deleted src/algorithms/walls.tsx.) Only
 // regenerate (vitest -u) for an intentional change.
 describe('generateMaze snapshots (seed 42, 13x25, app-style start/goal)', () => {
   const problem: MazeProblem = {
@@ -61,19 +62,29 @@ describe('generateMaze snapshots (seed 42, 13x25, app-style start/goal)', () => 
   });
 });
 
-// Start/goal strictly inside the border, start !== goal, plus a seed.
+// Start/goal anywhere on the board - interior, edges or corners (a marker
+// can be dragged or shared onto any cell) - start !== goal, plus a seed.
 const mazeCaseArbitrary = fc
   .record({
     rows: fc.integer({ min: 5, max: 40 }),
     columns: fc.integer({ min: 5, max: 40 }),
   })
   .chain(({ rows, columns }) => {
-    const interiorCell = fc
+    const anyCell = fc.integer({ min: 0, max: rows * columns - 1 });
+    // Bias toward the border and corners, where mazes are hardest to keep
+    // connected, so they come up in most runs rather than rarely.
+    const borderCell = fc
       .record({
-        row: fc.integer({ min: 1, max: rows - 2 }),
-        column: fc.integer({ min: 1, max: columns - 2 }),
+        side: fc.constantFrom('top', 'bottom', 'left', 'right'),
+        offset: fc.nat(),
       })
-      .map(({ row, column }) => row * columns + column);
+      .map(({ side, offset }) => {
+        if (side === 'top') return offset % columns;
+        if (side === 'bottom') return (rows - 1) * columns + (offset % columns);
+        if (side === 'left') return (offset % rows) * columns;
+        return (offset % rows) * columns + columns - 1;
+      });
+    const interiorCell = fc.oneof(anyCell, borderCell);
     return fc.record({
       problem: fc
         .record({ start: interiorCell, goal: interiorCell })
@@ -167,4 +178,49 @@ describe('generateMaze properties (random sizes, seeds and placements)', () => {
       { numRuns: 1000 }
     );
   });
+});
+
+// Regression test for start/goal on the border: an independent audit found
+// that a marker dragged or shared onto an edge or corner could be sealed
+// off (corners every time; Prim's often on edges). Checks every border
+// cell of the app's typical board size, for every algorithm.
+describe('generateMaze with start or goal on the border', () => {
+  const rows = 26;
+  const columns = 53;
+  const border: number[] = [];
+  for (let index = 0; index < rows * columns; index++) {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    if (
+      row === 0 ||
+      row === rows - 1 ||
+      column === 0 ||
+      column === columns - 1
+    ) {
+      border.push(index);
+    }
+  }
+
+  it.each(ALGORITHM_IDS)(
+    '%s keeps every border start connected to the goal',
+    algorithm => {
+      const interiorGoal = 12 * columns + 26;
+      const oppositeCorner = rows * columns - 1;
+      for (const start of border) {
+        for (const goal of [interiorGoal, oppositeCorner]) {
+          if (start === goal) continue;
+          const problem: MazeProblem = { rows, columns, start, goal };
+          const placements = generateMaze(
+            problem,
+            algorithm,
+            seededRandom(start)
+          );
+          expect(
+            isConnected(problem, placements),
+            `start ${start}, goal ${goal}`
+          ).toBe(true);
+        }
+      }
+    }
+  );
 });

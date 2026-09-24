@@ -247,7 +247,8 @@ function renderResult(
 // Locks in each algorithm's exact exploration and path on one board, so any
 // behavior change shows up as a readable diff in review. BFS/DFS output was
 // proven identical to the pre-engine implementation (src/algorithms/
-// paths.tsx, see git history) before it was removed. Only regenerate
+// paths.tsx, deleted in commit "Remove the pre-engine algorithms and
+// document the architecture"). Only regenerate
 // (vitest -u) for an intentional change.
 describe('search snapshots', () => {
   it.each(ALL)('%s', algorithm => {

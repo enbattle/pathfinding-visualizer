@@ -205,6 +205,44 @@ describe('Visualizer', () => {
       expect(visualizer.cellKind(START)).toBe('empty');
     });
 
+    it('a dragged marker passes over walls and weights without erasing them', () => {
+      const { visualizer } = create();
+      for (const [cell, mode] of [
+        [at(2, 2), 'wall'],
+        [at(2, 3), 'weight'],
+      ] as const) {
+        visualizer.beginGesture(cell, mode);
+        visualizer.endGesture();
+      }
+      // Drag S right across the wall and the weight, then drop past them.
+      visualizer.beginGesture(START, 'wall');
+      visualizer.continueGesture(at(2, 2));
+      expect(visualizer.cellKind(at(2, 2))).toBe('start'); // covered for now
+      visualizer.continueGesture(at(2, 3));
+      visualizer.continueGesture(at(2, 4));
+      visualizer.endGesture();
+      expect(visualizer.cellKind(at(2, 2))).toBe('wall');
+      expect(visualizer.cellKind(at(2, 3))).toBe('weight');
+      expect(visualizer.getSnapshot().grid.weights[at(2, 3)]).toBe(
+        WEIGHTED_TERRAIN_COST
+      );
+      expect(visualizer.getSnapshot().start).toBe(at(2, 4));
+    });
+
+    it('dropping a marker onto a wall replaces the wall', () => {
+      const { visualizer } = create();
+      visualizer.beginGesture(at(2, 2), 'wall');
+      visualizer.endGesture();
+      visualizer.beginGesture(START, 'wall');
+      visualizer.continueGesture(at(2, 2));
+      visualizer.endGesture();
+      // Moving the marker on later leaves plain floor, not the old wall.
+      visualizer.beginGesture(at(2, 2), 'wall');
+      visualizer.continueGesture(at(2, 1));
+      visualizer.endGesture();
+      expect(visualizer.cellKind(at(2, 2))).toBe('empty');
+    });
+
     it('continueGesture without a gesture does nothing', () => {
       const { visualizer } = create();
       const before = visualizer.getSnapshot();
@@ -249,6 +287,24 @@ describe('Visualizer', () => {
     expect(visualizer.player.getState().length).toBe(
       runLength + Math.ceil(400 * 0.35)
     );
+  });
+
+  it('bumps boardRevision for board changes only, not for runs', () => {
+    const { visualizer, clock } = create();
+    const revision = () => visualizer.getSnapshot().boardRevision;
+    const initial = revision();
+    visualizer.visualize('bfs');
+    clock.runUntilIdle();
+    visualizer.resetPath();
+    expect(revision()).toBe(initial);
+
+    visualizer.beginGesture(at(0, 0), 'wall');
+    visualizer.endGesture();
+    expect(revision()).toBe(initial + 1);
+    visualizer.buildMaze('prims', seededRandom(1));
+    expect(revision()).toBe(initial + 2);
+    visualizer.resetAll();
+    expect(revision()).toBe(initial + 3);
   });
 
   it('notifies subscribers with a new snapshot on every change', () => {

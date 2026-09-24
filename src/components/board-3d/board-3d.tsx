@@ -33,7 +33,7 @@ export default function Board3D({
   const [contextLost, setContextLost] = React.useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const { rows, columns } = visualizer.getSnapshot().grid;
-  const ariaLabel = `${label} in 3D, ${rows} rows by ${columns} columns. Drag to orbit, scroll to zoom. Switch to 2D to edit.`;
+  const ariaLabel = `${label} in 3D, ${rows} rows by ${columns} columns. Drag to orbit, scroll to zoom; with focus, arrow keys pan and Shift+arrow keys rotate. Switch to 2D to edit.`;
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -47,9 +47,10 @@ export default function Board3D({
     // context.
     const canvas = document.createElement('canvas');
     canvas.setAttribute('role', 'img');
+    canvas.tabIndex = 0; // focusable, so the keyboard can orbit too
     canvas.setAttribute('aria-label', ariaLabel);
     canvas.className =
-      'absolute inset-0 h-full w-full cursor-grab touch-none rounded-md active:cursor-grabbing';
+      'absolute inset-0 h-full w-full cursor-grab touch-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing';
     container.appendChild(canvas);
 
     const scene = new BoardScene(canvas, rows, columns, readPalette(canvas), {
@@ -57,6 +58,7 @@ export default function Board3D({
     });
     const controls = new OrbitControls(scene.camera, canvas);
     controls.enableDamping = !reducedMotion;
+    controls.listenToKeyEvents(canvas);
     controls.maxPolarAngle = Math.PI * 0.44; // never look from under the floor
     const span = Math.max(rows, columns);
     controls.minDistance = span * 0.35;
@@ -118,6 +120,7 @@ export default function Board3D({
       controls.removeEventListener('change', requestDraw);
       observer?.disconnect();
       if (frame !== null) cancelAnimationFrame(frame);
+      controls.stopListenToKeyEvents();
       controls.dispose();
       scene.dispose();
       canvas.remove();

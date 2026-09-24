@@ -83,7 +83,7 @@ const wallCount = () =>
 
 // The value shown under a stat's label in the run statistics.
 function stat(label: string): string {
-  const status = screen.getByRole('status', { name: 'Run statistics' });
+  const status = screen.getByRole('group', { name: 'Run statistics' });
   return within(status).getByText(label).nextElementSibling?.textContent ?? '';
 }
 
@@ -175,6 +175,15 @@ describe('Workspace (component/integration)', () => {
     fireEvent.click(button('Weighted Terrain'));
     click(canvas, index(5, 6));
     expect(visualizer.cellKind(index(5, 6))).toBe('weight');
+  });
+
+  it('a fast drag paints every cell it crosses, not just where events land', () => {
+    const { canvas } = renderApp();
+    // One pointer move jumping four cells, as a quick flick produces.
+    drag(canvas, [index(5, 5), index(5, 9)]);
+    for (let column = 5; column <= 9; column++) {
+      expect(visualizer.cellKind(index(5, column))).toBe('wall');
+    }
   });
 
   it('click-and-drag paints, and a drag starting on a painted cell erases', () => {
@@ -319,7 +328,7 @@ describe('Workspace: race mode', () => {
     ).toEqual(['greedy', 'dijkstra', 'astar']);
 
     playToEnd();
-    const standings = screen.getByRole('status', { name: 'Race standings' });
+    const standings = screen.getByRole('table', { name: 'Race standings' });
     const rows = within(standings).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(3);
     // On an open board every racer reaches the goal; Dijkstra and A* are
@@ -434,12 +443,14 @@ describe('Workspace: share links', () => {
     renderApp();
     const original = visualizer;
     const board = {
-      rows: 3,
-      columns: 4,
+      rows: 5,
+      columns: 5,
       start: 0,
-      goal: 11,
-      walls: Uint8Array.of(0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
-      weights: new Uint8Array(12).fill(1),
+      goal: 24,
+      walls: Uint8Array.from({ length: 25 }, (_, i) =>
+        i % 5 === 2 && i < 20 ? 1 : 0
+      ),
+      weights: new Uint8Array(25).fill(1),
     };
     act(() => {
       window.history.replaceState(
@@ -452,6 +463,54 @@ describe('Workspace: share links', () => {
     expect(visualizer).not.toBe(original);
     expect(visualizer.exportBoard()).toEqual(board);
     expect(snapshot().runs[0]).toMatchObject({ algorithm: 'dfs' });
+  });
+
+  it('drops the link from the address bar once the board is edited', () => {
+    const board = {
+      rows: 5,
+      columns: 5,
+      start: 0,
+      goal: 24,
+      walls: new Uint8Array(25),
+      weights: new Uint8Array(25).fill(1),
+    };
+    window.history.replaceState(
+      null,
+      '',
+      '/#' + encodeShare({ board, mode: 'explore', algorithms: ['bfs'] })
+    );
+    const { canvas } = renderApp();
+    // Replaying the link's own run leaves it valid...
+    playToEnd();
+    expect(window.location.hash).toMatch(/^#v=1&b=/);
+    // ...but after an edit it would reload the old board, so it goes.
+    act(() => {
+      fireEvent.pointerDown(canvas, { ...point(12), button: 0 });
+      fireEvent.pointerUp(canvas, point(12));
+    });
+    expect(window.location.hash).toBe('');
+  });
+
+  it('keeps a link pasted in after earlier edits', () => {
+    const { canvas } = renderApp();
+    fireEvent.pointerDown(canvas, { ...point(index(5, 5)), button: 0 });
+    fireEvent.pointerUp(canvas, point(index(5, 5)));
+    const board = {
+      rows: 5,
+      columns: 5,
+      start: 0,
+      goal: 24,
+      walls: new Uint8Array(25),
+      weights: new Uint8Array(25).fill(1),
+    };
+    const link =
+      '#' + encodeShare({ board, mode: 'explore', algorithms: ['dfs'] });
+    act(() => {
+      window.history.replaceState(null, '', link);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(visualizer.exportBoard()).toEqual(board);
+    expect(window.location.hash).toBe(link);
   });
 
   it('reports a broken link and falls back to a fresh board', () => {
@@ -481,5 +540,44 @@ describe('Workspace: 3D view', () => {
 
     fireEvent.click(button('2D'));
     expect(screen.getByRole('application')).toBeInTheDocument();
+  });
+});
+
+describe('Workspace: screen reader announcements', () => {
+  beforeEach(setSmallViewport);
+
+  it('announces each phase once, not every frame', () => {
+    renderApp();
+    fireEvent.click(button('Visualize'));
+    const live = () =>
+      Array.from(document.querySelectorAll('[aria-live="polite"]'))
+        .map(region => region.textContent)
+        .filter(Boolean);
+    expect(live()).toContain('A* Algorithm is exploring.');
+    // The statistics themselves are not a live region.
+    expect(
+      screen.getByRole('group', { name: 'Run statistics' })
+    ).not.toHaveAttribute('aria-live');
+    playToEnd();
+    expect(
+      live().some(text =>
+        /^Path found: \d+ cells, cost \d+, the shortest possible\.$/.test(text!)
+      )
+    ).toBe(true);
+  });
+
+  it('announces the race result once everyone has finished', () => {
+    renderApp();
+    fireEvent.click(button('Race'));
+    fireEvent.click(button('Start race'));
+    const live = () =>
+      Array.from(document.querySelectorAll('[aria-live="polite"]')).map(
+        region => region.textContent
+      );
+    expect(live()).toContain('Race in progress.');
+    playToEnd();
+    expect(
+      live().some(text => /^Race finished\. First: .+\.$/.test(text ?? ''))
+    ).toBe(true);
   });
 });

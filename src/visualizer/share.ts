@@ -1,4 +1,8 @@
-import { PATH_ALGORITHMS, type PathAlgorithmId } from '../engine';
+import {
+  PATH_ALGORITHMS,
+  WEIGHTED_TERRAIN_COST,
+  type PathAlgorithmId,
+} from '../engine';
 
 // Share-by-URL: a board plus the algorithm choice, packed into a URL
 // fragment. The fragment is untrusted input (anyone can hand you a link),
@@ -7,14 +11,12 @@ import { PATH_ALGORITHMS, type PathAlgorithmId } from '../engine';
 
 export const SHARE_VERSION = 1;
 export const MAX_SHARED_CELLS = 20_000;
-export const MIN_SHARED_DIMENSION = 2;
+// Smaller boards have no interior for a maze, and on 3-4 rows the app's
+// random start/goal placement (board-setup.ts) could pick the same cell.
+export const MIN_SHARED_DIMENSION = 5;
 export const MAX_SHARED_DIMENSION = 200;
 /** Longer input is rejected before any decoding. */
 export const MAX_FRAGMENT_LENGTH = 12_000;
-
-// Must match WEIGHTED_TERRAIN_COST in visualizer.ts. Weights are shared as
-// one bit per cell ("weighted or not") and decode to this cost.
-const WEIGHTED_COST = 5;
 
 export interface SharedBoard {
   readonly rows: number;
@@ -254,7 +256,7 @@ function decodeUnsafe(fragment: string): DecodeResult {
     const bit = 1 << (i % 8);
     if (bytes[HEADER_BYTES + (i >> 3)] & bit) walls[i] = 1;
     if (bytes[HEADER_BYTES + bitsetBytes + (i >> 3)] & bit) {
-      weights[i] = WEIGHTED_COST;
+      weights[i] = WEIGHTED_TERRAIN_COST;
     }
   }
   const board: SharedBoard = {

@@ -4,6 +4,9 @@
 // the app's algorithms (no heap, no frontier abstraction) so a bug in those
 // can't also hide in the thing checking them.
 import fc from 'fast-check';
+// Only the cost constant comes from the engine; the oracles below share no
+// code with it.
+import { WEIGHTED_TERRAIN_COST } from '../engine';
 
 // A grid problem in the simplest possible encoding: flat row-major arrays,
 // index = row * columns + column.
@@ -17,8 +20,8 @@ export interface GridProblem {
   goal: number;
 }
 
-// The weighted-terrain cost the app paints (board.tsx's WEIGHT_VALUE).
-export const WEIGHTED_COST = 5;
+// The weighted-terrain cost the app paints (WEIGHTED_TERRAIN_COST).
+export const WEIGHTED_COST = WEIGHTED_TERRAIN_COST;
 
 export interface GridProblemOptions {
   maxSize?: number;

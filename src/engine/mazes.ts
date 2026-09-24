@@ -25,7 +25,7 @@ export interface MazeProblem {
 
 /**
  * One animated wall placement. `tick` is the animation step it lands on
- * (the board multiplies by its per-step delay); several placements can
+ * (playback advances ticks at the Player's rate); several placements can
  * share a tick, which is how independent parts of a maze animate in
  * parallel.
  */
@@ -68,7 +68,9 @@ class PlacementLog {
  * Generates a maze as a list of timed wall placements: the outer border
  * plus the chosen algorithm's interior, both starting at tick 0 so they
  * animate in parallel. The result has one entry per walled cell (at its
- * earliest tick), sorted by tick, and never walls `start` or `goal`.
+ * earliest tick), sorted by tick, never walls `start` or `goal`, and
+ * always leaves them connected - wherever they are, border and corners
+ * included (see anchorRoute).
  *
  * `random` is injected so a maze is exactly reproducible from a seed
  * (see seededRandom in ./random).
@@ -87,18 +89,67 @@ export function generateMaze(
     row: Math.floor(problem.goal / columns),
     column: problem.goal % columns,
   };
+  // Too thin for an interior: every cell is border, so any maze would wall
+  // start off from goal.
+  if (rows < 3 || columns < 3) return [];
+
   const log = new PlacementLog(columns);
   const interior = { y: 1, x: 1, maxY: rows - 2, maxX: columns - 2 };
+  const startRoute = anchorRoute(start, rows, columns);
+  const goalRoute = anchorRoute(goal, rows, columns);
+  const keepOpen = [...startRoute.route, ...goalRoute.route];
 
-  drawBorderWalls(log, start, goal, rows, columns);
+  drawBorderWalls(log, keepOpen, rows, columns);
+  // The interior algorithms protect (and connect) the interior end of each
+  // route, which is start/goal itself unless it sits on the border.
   if (algorithm === 'prims') {
-    prims(log, random, start, goal, interior);
+    prims(log, random, startRoute.inner, goalRoute.inner, interior);
   } else {
     const thickness = algorithm === 'recursive-division-thick' ? 2 : 1;
-    buildDividingWalls(log, random, thickness, 0, start, goal, interior);
+    buildDividingWalls(
+      log,
+      random,
+      thickness,
+      0,
+      startRoute.inner,
+      goalRoute.inner,
+      interior
+    );
   }
 
-  return log.toPlacements([problem.start, problem.goal]);
+  return log.toPlacements(
+    keepOpen.map(({ row, column }) => row * columns + column)
+  );
+}
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+/**
+ * The interior algorithms guarantee connectivity for anchors *inside* the
+ * border - but start/goal can be dragged or shared onto the border itself,
+ * where the border walls (and Prim's lattice parity) would seal it off.
+ * So each anchor is routed to its nearest interior cell: `route` is the
+ * anchor plus the at most two cells stepping straight to `inner` (row
+ * first, then column - a corner needs both), all kept open; `inner` is
+ * what the interior algorithm then protects. For an interior anchor the
+ * route is just the anchor, so those mazes are unchanged.
+ */
+function anchorRoute(
+  anchor: Point,
+  rows: number,
+  columns: number
+): { inner: Point; route: Point[] } {
+  const inner: Point = {
+    row: clamp(anchor.row, 1, rows - 2),
+    column: clamp(anchor.column, 1, columns - 2),
+  };
+  const route: Point[] = [anchor];
+  if (anchor.row !== inner.row && anchor.column !== inner.column) {
+    route.push({ row: inner.row, column: anchor.column });
+  }
+  if (!isAt(anchor, inner.row, inner.column)) route.push(inner);
+  return { inner, route };
 }
 
 const isAt = (point: Point, row: number, column: number): boolean =>
@@ -106,18 +157,17 @@ const isAt = (point: Point, row: number, column: number): boolean =>
 
 // Walks the border clockwise from the top-left corner (down the left edge,
 // along the bottom, up the right, back along the top), one cell per tick.
-// The tick advances even for a skipped start/goal cell, so the animation
-// keeps a steady pace around the perimeter.
+// Cells on a start/goal route stay open; the tick advances past them
+// anyway, so the animation keeps a steady pace around the perimeter.
 function drawBorderWalls(
   log: PlacementLog,
-  start: Point,
-  goal: Point,
+  keepOpen: readonly Point[],
   rows: number,
   columns: number
 ): void {
   let tick = 0;
   const visit = (row: number, column: number): void => {
-    if (!isAt(start, row, column) && !isAt(goal, row, column)) {
+    if (!keepOpen.some(point => isAt(point, row, column))) {
       log.place(row, column, tick);
     }
     tick += 1;

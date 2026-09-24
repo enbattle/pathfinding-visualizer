@@ -10,7 +10,7 @@ import '@testing-library/jest-dom/vitest';
 // jsdom doesn't implement ResizeObserver at all. Radix's Slider (used for
 // Animation Speed) reads its thumb size via @radix-ui/react-use-size, which
 // calls `new ResizeObserver(...)` unconditionally on mount - without this
-// stub every test that renders <Configuration /> fails before any
+// stub every test that renders the app (<Workspace />) fails before any
 // assertion runs, since ResizeObserver is undefined in jsdom.
 class ResizeObserverStub {
   observe(): void {}

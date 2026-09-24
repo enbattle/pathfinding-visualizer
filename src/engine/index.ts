@@ -1,6 +1,6 @@
 // Public API of the engine: pure TypeScript, no React/DOM. The UI layer
 // imports from here only - see docs/architecture.md.
-export { createGrid, toIndex, rowOf, columnOf, type Grid } from './grid';
+export { createGrid, toIndex, WEIGHTED_TERRAIN_COST, type Grid } from './grid';
 export {
   PATH_ALGORITHMS,
   search,
