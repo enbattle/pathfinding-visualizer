@@ -465,3 +465,21 @@ describe('Workspace: share links', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+describe('Workspace: 3D view', () => {
+  beforeEach(setSmallViewport);
+
+  it('switches to the lazily loaded 3D view and back', async () => {
+    renderApp();
+    fireEvent.click(button('3D'));
+    // jsdom has no WebGL, so the lazily loaded view shows its fallback.
+    expect(
+      await screen.findByText(/The 3D view needs WebGL/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('application')).not.toBeInTheDocument();
+    expect(screen.getByText(/switch to 2D to edit/)).toBeInTheDocument();
+
+    fireEvent.click(button('2D'));
+    expect(screen.getByRole('application')).toBeInTheDocument();
+  });
+});

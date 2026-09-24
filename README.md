@@ -16,8 +16,12 @@ You can access it here: https://enbattle.github.io/pathfinding-visualizer/
 - **Live editing**: paint walls and weighted terrain, drag start/goal, or
   generate a maze; once a path is shown, edits update it instantly.
 - **Share**: copy a link that reopens the exact board and replays the run.
+- **3D view**: watch any run (or race) as a 3D scene. Walls rise, visited
+  cells ripple, and the path glows; orbit and zoom freely. It loads only
+  when you open it.
 - **Accessible**: the board is keyboard-operable (arrow keys, Space) and
-  announces the cell under the cursor to screen readers.
+  announces the cell under the cursor to screen readers; animations
+  respect `prefers-reduced-motion`.
 
 ## Current Pathfinding Algorithm Selection
 

@@ -65,6 +65,20 @@ changes.
     sizing, redraw scheduling, pointer and keyboard input.
   - `algorithm-guides.ts` - per-algorithm pseudocode and explanations.
     Keep the pseudocode in step with `SPECS` in `engine/pathfinding.ts`.
+  - `board-3d/` - the lazily loaded 3D view (plain `three`, no React
+    Three Fiber). `cell-pose.ts` maps `cellLayer()` to a box height and
+    color (pure, unit-tested); `board-scene.ts` is the imperative
+    three.js scene (one `InstancedMesh` for all cells, path tube);
+    `board-3d.tsx` mounts it. Two rules learned the hard way:
+    - Only `board-area.tsx` may import `board-3d/board-3d` (and only
+      via `React.lazy`). Importing three anywhere else pulls it into the
+      main bundle; check `npm run build` output (the `board-3d-*.js`
+      chunk).
+    - Create a fresh `<canvas>` per scene. `dispose()` deliberately loses
+      the WebGL context, and a canvas that lost its context can never
+      make a working one again.
+  - `error-boundary.tsx` - contains a failing subtree (the 3D view is
+    wrapped in one) so it can't unmount the whole app.
 - Animation: never use `setTimeout`/`setInterval` to animate. Anything
   that changes over time goes through the `Player`, and everything drawn
   must be derivable from (snapshot, tick) - otherwise scrubbing breaks.

@@ -92,6 +92,40 @@ become `Visualizer` gestures, and the canvas is also keyboard-operable:
 arrow keys move a cursor, Space paints or erases, and Space on S/G picks
 it up and drops it. A polite live region announces the cursor's cell.
 
+With `prefers-reduced-motion`, entrance animations are skipped: cells
+appear settled, and playback still steps cell by cell.
+
+## The 3D view
+
+The 3D view (`src/components/board-3d/`) is a second renderer over the
+same data. Each cell's `cellLayer()`, the same function the 2D renderer
+uses, maps to a box height and color (`cellPose()`). Walls grow up out
+of the floor, visited cells ripple up and settle, and the path rises
+under a glowing tube. So the two views always agree, and scrubbing works
+identically.
+
+- **One draw call for the board.** Every cell is an instance of one
+  rounded-box `InstancedMesh`; a frame rewrites the instance matrices and
+  colors. Update plus render takes a median of about 2 ms in Chrome for a
+  1,378-cell board.
+- **Renders on demand.** The view redraws only when the board, the
+  playhead, the camera or the size changes, and keeps going only while
+  orbit damping is still gliding.
+- **Framing.** On every resize the camera moves along its viewing
+  direction to the closest distance at which all board corners project
+  inside the viewport, found by binary search since the fit is monotonic
+  in distance.
+- **Loaded only when used.** `React.lazy` puts three.js in its own chunk
+  (about 145 kB gzipped); 2D-only visitors never download it.
+- **Fails safely.** Without WebGL it shows a message instead. An error
+  boundary contains a failed context or a chunk that won't load, with
+  "Try again". A lost context (GPU reset) offers a restart. Each scene
+  gets a fresh canvas, and its context is released on dispose, because
+  browsers cap live WebGL contexts.
+
+It's a viewing mode: drag orbits and the wheel zooms. Editing stays in
+2D, where a pointer maps to a cell unambiguously.
+
 ## Data model
 
 A board is a `Grid` (`src/engine/grid.ts`): `rows`, `columns`, and two

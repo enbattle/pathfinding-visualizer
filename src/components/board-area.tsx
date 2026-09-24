@@ -1,10 +1,20 @@
+import React from 'react';
+import { BoxIcon, SquareIcon } from 'lucide-react';
 import { runPhase, type SearchRun } from '../visualizer/runs';
 import type { PaintMode, Visualizer } from '../visualizer/visualizer';
 import { algorithmLabel } from './algorithm-guides';
 import { BoardCanvas } from './board-canvas';
 import { PlaybackControls } from './playback-controls';
+import { Segmented } from './segmented';
+import { ErrorBoundary } from './error-boundary';
+import { Button } from '@/components/ui/button';
 import { usePlayerState, useVisualizerSnapshot } from './use-visualizer';
 import { cn } from '@/lib/utils';
+
+// three.js is only downloaded when someone switches to the 3D view.
+const Board3D = React.lazy(() => import('./board-3d/board-3d'));
+
+export type BoardView = '2d' | '3d';
 
 const LEGEND_ITEMS: { label: string; swatchClassName: string }[] = [
   { label: 'Start', swatchClassName: 'legend-swatch-start' },
@@ -58,6 +68,7 @@ interface BoardAreaProps {
  */
 export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
   const snapshot = useVisualizerSnapshot(visualizer);
+  const [view, setView] = React.useState<BoardView>('2d');
   const searches = snapshot.runs.filter(
     (run): run is SearchRun => run.kind === 'search'
   );
@@ -66,6 +77,23 @@ export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {view === '2d'
+            ? 'Click or drag to paint · drag S or G to move them'
+            : 'Drag to orbit · scroll to zoom · switch to 2D to edit'}
+        </p>
+        <Segmented
+          label="View"
+          size="xs"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: '2d', label: '2D', icon: <SquareIcon /> },
+            { value: '3d', label: '3D', icon: <BoxIcon /> },
+          ]}
+        />
+      </div>
       <div
         className={cn(
           'grid min-h-0 flex-1 gap-3',
@@ -93,12 +121,65 @@ export function BoardArea({ visualizer, paintMode }: BoardAreaProps) {
               </div>
             )}
             <div className="min-h-0 flex-1">
-              <BoardCanvas
-                visualizer={visualizer}
-                paintMode={paintMode}
-                runIndex={i}
-                label={run ? `${algorithmLabel(run.algorithm)} board` : 'Board'}
-              />
+              {view === '2d' ? (
+                <BoardCanvas
+                  visualizer={visualizer}
+                  paintMode={paintMode}
+                  runIndex={i}
+                  label={
+                    run ? `${algorithmLabel(run.algorithm)} board` : 'Board'
+                  }
+                />
+              ) : (
+                <ErrorBoundary
+                  fallback={retry => (
+                    <div
+                      role="alert"
+                      className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+                    >
+                      The 3D view couldn't start (WebGL failed or the 3D code
+                      didn't load). The 2D view still works.
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={retry}
+                        >
+                          Try again
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setView('2d')}
+                        >
+                          Back to 2D
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                >
+                  <React.Suspense
+                    fallback={
+                      <div
+                        role="status"
+                        className="grid h-full place-items-center text-sm text-muted-foreground"
+                      >
+                        Loading the 3D view…
+                      </div>
+                    }
+                  >
+                    <Board3D
+                      visualizer={visualizer}
+                      runIndex={i}
+                      label={
+                        run ? `${algorithmLabel(run.algorithm)} board` : 'Board'
+                      }
+                    />
+                  </React.Suspense>
+                </ErrorBoundary>
+              )}
             </div>
           </div>
         ))}
