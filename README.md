@@ -8,25 +8,35 @@ You can access it here: https://enbattle.github.io/pathfinding-visualizer/
   - Dijkstra's Algorithm
   - A* Search
   - Greedy Best-first Search
-  - Breath-first Search
+  - Breadth-first Search
   - Depth-first Search
 
 ## Current Wall-Building Algorithm Selection
   - Recursive Division
   - Twin Recursive Division
+  - Prim's Algorithm
+
+## Development
+
+Requires Node 22+.
+
+```bash
+npm install
+npm run dev          # local dev server
+npm run lint         # ESLint
+npm run format       # Prettier (write); format:check verifies only
+npm run typecheck    # tsc
+npm run test:run     # Vitest, single run (npm test for watch mode)
+npm run build        # production bundle in dist/
+```
 
 ## Deployment
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which installs
 dependencies, builds the production bundle, and publishes it to GitHub
-Pages via `actions/deploy-pages`. This is the primary way the live site
-gets updated - it doesn't force-push or need local GitHub credentials.
-
-`npm run deploy` (which runs `gh-pages -d dist`) is still available as a
-manual local fallback that builds and pushes the production bundle to a
-`gh-pages` branch directly from your machine, for cases where you can't or
-don't want to use GitHub Actions.
+Pages via `actions/deploy-pages`. It can also be re-run manually from the
+Actions tab (`workflow_dispatch`).
 
 Pull requests and pushes to `main` are also checked by
-`.github/workflows/ci.yml`, which runs the test suite and a production
-build.
+`.github/workflows/ci.yml`, which runs formatting, lint, typecheck, the
+test suite, and a production build.

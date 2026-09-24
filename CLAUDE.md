@@ -7,8 +7,8 @@ Guidance for working in this repository.
 `pathfinding-visualizer` is a Vite + React + TypeScript app that animates
 pathfinding algorithms (BFS, DFS, Dijkstra's, A*, Greedy Best-first) and
 maze/wall-generation algorithms (Recursive Division, single- and
-double-thickness) on a grid. No backend; deployed as a static site to
-GitHub Pages via `.github/workflows/deploy.yml`.
+double-thickness, and randomized Prim's) on a grid. No backend; deployed
+as a static site to GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Where things live
 
@@ -18,9 +18,9 @@ GitHub Pages via `.github/workflows/deploy.yml`.
   structure (`Queue`/`Stack`/`PriorityQueueAscend`) and priority function
   each algorithm uses - see the comment above `search()` before adding a
   6th algorithm or changing how any existing one explores.
-- `src/algorithms/walls.tsx` - both Recursive Division variants reduce to
-  one shared `buildDividingWalls()`, parameterized by wall thickness (1 or
-  2 cells). Each wall normally leaves exactly one opening, which is what
+- `src/algorithms/walls.tsx` - Prim's, plus both Recursive Division
+  variants, which reduce to one shared `buildDividingWalls()`,
+  parameterized by wall thickness (1 or 2 cells). Each wall normally leaves exactly one opening, which is what
   keeps every generated maze fully connected. The one exception is
   deliberate: if start/goal's own row (or column, for vertical walls)
   falls inside the wall's own thickness-span rather than merely being
@@ -55,6 +55,7 @@ GitHub Pages via `.github/workflows/deploy.yml`.
 ## Verifying a change
 
 ```bash
+npm run format:check
 npm run typecheck
 npm run lint
 npm run test:run
@@ -68,5 +69,5 @@ reachable and the animation renders correctly.
 ## Deployment
 
 See the README's Deployment section - pushing to `main` runs
-`.github/workflows/deploy.yml` (Actions-based, primary); `npm run deploy`
-(the `gh-pages` package) is a manual local fallback.
+`.github/workflows/deploy.yml` (GitHub Actions -> Pages). That's the only
+deploy path; there is no local `npm run deploy`.
