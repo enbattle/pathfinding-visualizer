@@ -98,20 +98,37 @@ changes.
   change is intentional, and say so in the commit message.
 - Before trusting a new property, check it can fail: temporarily break the
   code it guards and confirm the test goes red.
+- **End-to-end tests** (`e2e/`, Playwright, Chromium) run against the
+  production build via `vite preview`. They cover what jsdom can't: real
+  layout, canvas pixels, WebGL, the lazy 3D chunk and the CSP. Rules:
+  - Assert on canvas colors with `expectCellColor()` (exact fills,
+    identical on every OS), not pixel-diffed screenshots. Attach
+    screenshots with `testInfo.attach` for humans to look at.
+  - Use the `test`/`expect` exported by `e2e/fixtures.ts`: its automatic
+    `problems` fixture fails any test on a console error, uncaught
+    exception or CSP violation.
+  - Use deterministic boards (`fixtureLink()`) and `finishPlayback()`,
+    never fixed waits: runs may finish before a click lands.
+- Unit tests must not import three.js; code that needs WebGL is covered
+  by the e2e suite (jsdom has no WebGL).
 
 ## Verifying a change
 
 ```bash
 npm run format:check
+npm run lint            # --max-warnings 0: warnings fail too
 npm run typecheck
-npm run lint
 npm run test:run
 npm run build
+npm run check:bundle    # gzipped size budgets; three.js stays out of the main bundle
+npm run test:e2e        # Playwright; first time: npx playwright install chromium
 ```
 
-`npm run dev` for manual checks: build walls with each algorithm, run each
-of the 5 path algorithms against them, and confirm start/goal stay
-reachable and the animation renders correctly.
+`npm run bench` prints engine benchmarks (report-only; see the note in
+`src/engine/engine.bench.ts` about absolute numbers).
+
+CI (`.github/workflows/ci.yml`) runs all of the above plus `npm audit`.
+Actions are pinned to commit SHAs; Dependabot bumps them.
 
 ## Deployment
 

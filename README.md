@@ -47,9 +47,15 @@ npm run dev          # local dev server
 npm run lint         # ESLint
 npm run format       # Prettier (write); format:check verifies only
 npm run typecheck    # tsc
-npm run test:run     # Vitest, single run (npm test for watch mode)
+npm run test:run     # Vitest unit + component tests (npm test for watch mode)
 npm run build        # production bundle in dist/
+npm run check:bundle # bundle size budgets (after build)
+npm run test:e2e     # Playwright end-to-end tests against the production build
+npm run bench        # engine benchmarks
 ```
+
+The first time you run the e2e tests, install their browser with
+`npx playwright install chromium`.
 
 ## Architecture
 
@@ -66,5 +72,9 @@ Pages via `actions/deploy-pages`. It can also be re-run manually from the
 Actions tab (`workflow_dispatch`).
 
 Pull requests and pushes to `main` are also checked by
-`.github/workflows/ci.yml`, which runs formatting, lint, typecheck, the
-test suite, and a production build.
+`.github/workflows/ci.yml`: formatting, lint (zero warnings), typecheck,
+unit tests, a production build with bundle budgets, `npm audit`,
+Playwright end-to-end tests (report uploaded as an artifact), and engine
+benchmarks (shown in the run summary). The deploy workflow re-runs the
+key checks before publishing. Dependabot opens grouped weekly update PRs
+for npm packages and the SHA-pinned GitHub Actions.

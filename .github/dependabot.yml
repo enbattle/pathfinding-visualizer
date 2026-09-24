@@ -1,0 +1,65 @@
+# Weekly dependency updates, grouped so they arrive as a few reviewable PRs rather than one per
+# package. Each PR runs the full CI (unit, e2e, bundle budget, audit), which is what makes merging
+# them low-risk. Security updates are separate and immediate (enable "Dependabot security updates"
+# in the repo's Settings > Code security).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      ui:
+        patterns:
+          [
+            'radix-ui',
+            'lucide-react',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+            'tailwindcss',
+            '@tailwindcss/*',
+            'tw-animate-css',
+          ]
+      three:
+        patterns: ['three', '@types/three']
+      build-and-test:
+        patterns:
+          [
+            'vite',
+            '@vitejs/*',
+            'vitest',
+            '@playwright/test',
+            'jsdom',
+            '@testing-library/*',
+            'fast-check',
+          ]
+      lint-and-types:
+        patterns:
+          [
+            'eslint',
+            '@eslint/*',
+            'eslint-plugin-*',
+            'typescript',
+            'typescript-eslint',
+            'globals',
+            'prettier',
+            'prettier-plugin-*',
+            '@types/node',
+          ]
+    ignore:
+      # typescript-eslint supports TypeScript <6.1 so far; take TS 7 once it does.
+      - dependency-name: typescript
+        versions: ['>=7']
+
+  # Keeps the SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
