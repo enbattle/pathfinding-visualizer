@@ -58,7 +58,8 @@ Design notes: [docs/architecture.md](docs/architecture.md) and [docs/decisions.m
 
 ## Development
 
-Requires Node 22+.
+Requires Node 22.22.2+, 24.15+ or 26+ (the range jsdom 30, used by the unit
+tests, supports).
 
 ```bash
 npm install
