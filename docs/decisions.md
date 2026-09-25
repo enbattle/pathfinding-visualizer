@@ -141,3 +141,19 @@ mixed visual styles. Lucide is shadcn's default icon set, and
 `components.json` points at it.
 
 **Revisit if:** a needed icon doesn't exist in Lucide.
+
+## 13. "Cheapest", not "shortest", for the lowest-cost path
+
+**Decision:** the UI says "cheapest" wherever it means the lowest total
+cost (the race table, the explore stats, the screen-reader announcement).
+The race table's Cost and Cheapest headers explain themselves in a
+tooltip.
+
+**Why:** with weighted terrain the lowest-cost path isn't always the one
+with the fewest cells, so "shortest" was ambiguous. The tooltips are
+Radix's, which ignore taps, so the header buttons also open them on click
+(a second tap closes them). Content stays hoverable and Escape closes it
+(WCAG 1.4.13).
+
+**Revisit if:** weighted terrain is removed. Cost then equals length and
+"shortest" is accurate again.

@@ -30,7 +30,7 @@ Design notes: [docs/architecture.md](docs/architecture.md) and [docs/decisions.m
   cheapest possible.
 - **Race**: run 2–4 algorithms side by side on the same board, one cell
   per step each, with live standings: who reached the goal with the least
-  work, and whose path is actually shortest.
+  work, and whose path is actually cheapest.
 - **Playback**: pause, step, and scrub any run forwards or backwards.
 - **Live editing**: paint walls and weighted terrain, drag start/goal, or
   generate a maze; once a path is shown, edits update it instantly.

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CheckIcon, TrophyIcon, TriangleAlertIcon } from 'lucide-react';
-import type { PathAlgorithmId } from '../engine';
+import { WEIGHTED_TERRAIN_COST, type PathAlgorithmId } from '../engine';
 import {
   discoveredAt,
   runPhase,
@@ -15,6 +15,12 @@ import {
   shortAlgorithmLabel,
 } from './algorithm-guides';
 import { usePlayerState, useVisualizerSnapshot } from './use-visualizer';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from './ui/tooltip';
 import { cn } from '@/lib/utils';
 
 function formatCost(cost: number): string {
@@ -44,24 +50,24 @@ function Stat({
 }
 
 /** Is `run`'s path as cheap as the best possible on this board? */
-function isShortest(run: SearchRun, bestCost: number | null): boolean | null {
+function isCheapest(run: SearchRun, bestCost: number | null): boolean | null {
   if (!run.result.path || bestCost === null) return null;
   return run.result.cost === bestCost;
 }
 
-function ShortestNote({
-  shortest,
+function CheapestNote({
+  cheapest,
   run,
   bestCost,
 }: {
-  shortest: boolean | null;
+  cheapest: boolean | null;
   run: SearchRun;
   bestCost: number | null;
 }) {
-  if (shortest === null) return null;
-  return shortest ? (
+  if (cheapest === null) return null;
+  return cheapest ? (
     <span className="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-400">
-      <CheckIcon className="size-3.5" aria-hidden="true" /> shortest
+      <CheckIcon className="size-3.5" aria-hidden="true" /> cheapest
     </span>
   ) : (
     <span className="text-xs font-medium text-amber-400">
@@ -75,16 +81,16 @@ function ShortestNote({
 function exploreAnnouncement(
   run: SearchRun,
   phase: RunPhase,
-  shortest: boolean | null
+  cheapest: boolean | null
 ): string {
   const name = algorithmLabel(run.algorithm);
   if (phase === 'explore') return `${name} is exploring.`;
   if (phase === 'unreachable') return `${name} found no path.`;
   if (phase === 'path') return `${name} found a path.`;
   const cost = `Path found: ${run.result.path?.length} cells, cost ${formatCost(run.result.cost)}`;
-  return shortest === false
-    ? `${cost}, not the shortest.`
-    : `${cost}, the shortest possible.`;
+  return cheapest === false
+    ? `${cost}, not the cheapest.`
+    : `${cost}, the cheapest possible.`;
 }
 
 /** Stats and a pseudocode walkthrough for the single search on screen. */
@@ -93,7 +99,7 @@ export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
   const { tick } = usePlayerState(visualizer.player);
   const [run] = searchRuns(snapshot);
   if (!run) return null;
-  const shortest = isShortest(run, snapshot.bestCost);
+  const cheapest = isCheapest(run, snapshot.bestCost);
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,8 +117,8 @@ export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
           label="Path cost"
           value={formatCost(run.result.cost)}
           note={
-            <ShortestNote
-              shortest={shortest}
+            <CheapestNote
+              cheapest={cheapest}
               run={run}
               bestCost={snapshot.bestCost}
             />
@@ -121,7 +127,7 @@ export function ExploreResults({ visualizer }: { visualizer: Visualizer }) {
         <Stat label="Algorithm time" value={`${run.searchMs.toFixed(2)}ms`} />
       </div>
       <p className="sr-only" aria-live="polite">
-        {exploreAnnouncement(run, runPhase(run, tick), shortest)}
+        {exploreAnnouncement(run, runPhase(run, tick), cheapest)}
       </p>
       <HowItWorks algorithm={run.algorithm} phase={runPhase(run, tick)} />
     </div>
@@ -191,10 +197,36 @@ export function HowItWorks({
   );
 }
 
+/** A column header that explains itself on hover, focus or tap. */
+function ColumnHint({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          // Radix tooltips ignore taps; this opens on click, and Radix's own close-on-click makes a second tap close it.
+          onClick={() => setOpen(true)}
+          className="cursor-help rounded-sm underline decoration-muted-foreground/60 decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{children}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /**
  * Live race standings. Every algorithm advances one discovered cell per
  * tick, so finishing order is "fewest cells explored before reaching the
- * goal"; the shortest column checks each path against the best possible.
+ * goal"; the cheapest column checks each path against the best possible.
  */
 export function RaceScoreboard({ visualizer }: { visualizer: Visualizer }) {
   const snapshot = useVisualizerSnapshot(visualizer);
@@ -223,74 +255,90 @@ export function RaceScoreboard({ visualizer }: { visualizer: Visualizer }) {
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
-      <table aria-label="Race standings" className="w-full text-left text-xs">
-        <thead className="bg-background/60 text-[11px] tracking-wide text-muted-foreground uppercase">
-          <tr>
-            <th className="px-3 py-2 font-medium">Algorithm</th>
-            <th className="px-2 py-2 text-right font-medium">Explored</th>
-            <th className="px-2 py-2 text-right font-medium">Cost</th>
-            <th className="px-3 py-2 text-right font-medium">Shortest</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map(run => {
-            const done = searchFinished(run, tick);
-            const place = done && run.result.path ? placeOf(run) : null;
-            const shortest = done ? isShortest(run, snapshot.bestCost) : null;
-            return (
-              <tr key={run.algorithm} className="border-t border-border/60">
-                <th scope="row" className="px-3 py-2 font-medium">
-                  <span className="flex items-center gap-1.5">
-                    {place === 1 && (
-                      <TrophyIcon
-                        className="size-3.5 text-amber-400"
-                        aria-label="First"
+      <TooltipProvider delayDuration={150}>
+        <table aria-label="Race standings" className="w-full text-left text-xs">
+          <thead className="bg-background/60 text-[11px] tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th className="px-3 py-2 font-medium">Algorithm</th>
+              <th className="px-2 py-2 text-right font-medium">Explored</th>
+              <th className="px-2 py-2 text-right font-medium">
+                <ColumnHint label="Cost">
+                  The total cost of the path this algorithm found. Stepping onto
+                  a normal cell costs 1 and weighted terrain costs{' '}
+                  {WEIGHTED_TERRAIN_COST}. The start cell is free.
+                </ColumnHint>
+              </th>
+              <th className="px-3 py-2 text-right font-medium">
+                <ColumnHint label="Cheapest">
+                  Is this path as cheap as any path on this board? A check means
+                  yes; +N means it costs N more than the cheapest possible,
+                  judged against Dijkstra, which always finds the cheapest. With
+                  weighted terrain, the cheapest path is not always the one with
+                  the fewest cells.
+                </ColumnHint>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {runs.map(run => {
+              const done = searchFinished(run, tick);
+              const place = done && run.result.path ? placeOf(run) : null;
+              const cheapest = done ? isCheapest(run, snapshot.bestCost) : null;
+              return (
+                <tr key={run.algorithm} className="border-t border-border/60">
+                  <th scope="row" className="px-3 py-2 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {place === 1 && (
+                        <TrophyIcon
+                          className="size-3.5 text-amber-400"
+                          aria-label="First"
+                        />
+                      )}
+                      {place !== null && place > 1 && (
+                        <span
+                          className="w-3.5 text-center text-muted-foreground"
+                          aria-label={`Place ${place}`}
+                        >
+                          {place}
+                        </span>
+                      )}
+                      <span title={algorithmLabel(run.algorithm)}>
+                        {shortAlgorithmLabel(run.algorithm)}
+                      </span>
+                    </span>
+                  </th>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {discoveredAt(run, tick)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {done ? formatCost(run.result.cost) : '…'}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {cheapest === true && (
+                      <CheckIcon
+                        className="ml-auto size-4 text-emerald-400"
+                        aria-label="Yes"
                       />
                     )}
-                    {place !== null && place > 1 && (
-                      <span
-                        className="w-3.5 text-center text-muted-foreground"
-                        aria-label={`Place ${place}`}
-                      >
-                        {place}
+                    {cheapest === false && (
+                      <span className="inline-flex items-center gap-1 text-amber-400">
+                        <TriangleAlertIcon
+                          className="size-3.5"
+                          aria-hidden="true"
+                        />
+                        +{run.result.cost - (snapshot.bestCost ?? 0)}
                       </span>
                     )}
-                    <span title={algorithmLabel(run.algorithm)}>
-                      {shortAlgorithmLabel(run.algorithm)}
-                    </span>
-                  </span>
-                </th>
-                <td className="px-2 py-2 text-right tabular-nums">
-                  {discoveredAt(run, tick)}
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">
-                  {done ? formatCost(run.result.cost) : '…'}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {shortest === true && (
-                    <CheckIcon
-                      className="ml-auto size-4 text-emerald-400"
-                      aria-label="Yes"
-                    />
-                  )}
-                  {shortest === false && (
-                    <span className="inline-flex items-center gap-1 text-amber-400">
-                      <TriangleAlertIcon
-                        className="size-3.5"
-                        aria-hidden="true"
-                      />
-                      +{run.result.cost - (snapshot.bestCost ?? 0)}
-                    </span>
-                  )}
-                  {shortest === null && (
-                    <span className="text-muted-foreground">…</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    {cheapest === null && (
+                      <span className="text-muted-foreground">…</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TooltipProvider>
     </div>
   );
 }
