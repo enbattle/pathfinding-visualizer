@@ -344,6 +344,41 @@ describe('Workspace: race mode', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it('explains the Cost and Cheapest columns in a tooltip', async () => {
+    renderApp();
+    fireEvent.click(button('Race'));
+    fireEvent.click(button('Start race'));
+    playToEnd();
+    const standings = screen.getByRole('table', { name: 'Race standings' });
+
+    // A click (a tap on touch devices) opens it; a second one closes it.
+    const cost = within(standings).getByRole('button', { name: 'Cost' });
+    fireEvent.click(cost);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'weighted terrain costs 5'
+    );
+    fireEvent.click(cost);
+    await waitFor(() =>
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    );
+
+    // Escape closes it too.
+    fireEvent.click(cost);
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    );
+
+    // Keyboard focus opens it too.
+    act(() =>
+      within(standings).getByRole('button', { name: 'Cheapest' }).focus()
+    );
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'cheapest possible'
+    );
+  });
+
   it('keeps 2 to 4 racers selected', () => {
     renderApp();
     fireEvent.click(button('Race'));
@@ -565,7 +600,7 @@ describe('Workspace: screen reader announcements', () => {
     playToEnd();
     expect(
       live().some(text =>
-        /^Path found: \d+ cells, cost \d+, the shortest possible\.$/.test(text!)
+        /^Path found: \d+ cells, cost \d+, the cheapest possible\.$/.test(text!)
       )
     ).toBe(true);
   });

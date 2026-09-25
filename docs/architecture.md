@@ -105,7 +105,7 @@ cursor's cell.
 For screen readers, the run statistics and race standings are plain
 labeled regions (they change every frame). A separate polite live region
 announces each phase once: exploring, path found (with cost and whether
-it's the shortest), or no path, and the race result when all racers
+it's the cheapest), or no path, and the race result when all racers
 finish.
 
 With `prefers-reduced-motion`, entrance animations are skipped: cells

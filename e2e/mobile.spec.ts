@@ -1,6 +1,7 @@
 import {
   expect,
   expectCellColor,
+  finishPlayback,
   fixtureLink,
   FIXTURE,
   test,
@@ -32,4 +33,14 @@ test('tapping a cell paints it', async ({ page }) => {
     position: { x: (target.column + 0.5) * size, y: (target.row + 0.5) * size },
   });
   await expectCellColor(page, target, 'wall');
+});
+
+test('tapping a race column header shows what it means', async ({ page }) => {
+  await page.goto(fixtureLink('race', ['greedy', 'dijkstra', 'astar']));
+  await finishPlayback(page);
+  await page
+    .getByRole('table', { name: 'Race standings' })
+    .getByRole('button', { name: 'Cheapest' })
+    .tap();
+  await expect(page.getByRole('tooltip')).toContainText('cheapest possible');
 });

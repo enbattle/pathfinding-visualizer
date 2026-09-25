@@ -47,6 +47,17 @@ test('a race with standings has no violations', async ({ page }) => {
   await expectNoViolations(page, 'race');
 });
 
+test('a race with a column hint open has no violations', async ({ page }) => {
+  await page.goto(fixtureLink('race', ['greedy', 'dijkstra', 'astar']));
+  await finishPlayback(page);
+  await page
+    .getByRole('table', { name: 'Race standings' })
+    .getByRole('button', { name: 'Cheapest' })
+    .hover();
+  await expect(page.getByRole('tooltip')).toBeVisible();
+  await expectNoViolations(page, 'race with a column hint');
+});
+
 test('the About dialog has no violations', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'About this app' }).click();

@@ -51,7 +51,7 @@ test('builds a maze, then finds a path through it', async ({ page }) => {
   await page.getByRole('button', { name: 'Visualize' }).click();
   await finishPlayback(page);
   const stats = page.getByRole('group', { name: 'Run statistics' });
-  await expect(stats).toContainText('shortest');
+  await expect(stats).toContainText('cheapest');
   await expect(page.getByText('Path found', { exact: true })).toBeVisible();
 });
 
@@ -71,7 +71,7 @@ test('a share link restores the board and replays its run', async ({
   await expectCellColor(page, FIXTURE.gap, 'path');
   await expect(
     page.getByRole('group', { name: 'Run statistics' })
-  ).toContainText('shortest');
+  ).toContainText('cheapest');
   await testInfo.attach('shared board', {
     body: await page.screenshot(),
     contentType: 'image/png',
@@ -117,6 +117,35 @@ test('races three algorithms on one board', async ({ page }, testInfo) => {
     body: await page.screenshot(),
     contentType: 'image/png',
   });
+});
+
+test('the Cost and Cheapest headers explain themselves on hover', async ({
+  page,
+}) => {
+  await page.goto(fixtureLink('race', ['greedy', 'dijkstra', 'astar']));
+  await finishPlayback(page);
+  const standings = page.getByRole('table', { name: 'Race standings' });
+
+  await standings.getByRole('button', { name: 'Cost' }).hover();
+  await expect(page.getByRole('tooltip')).toContainText(
+    'weighted terrain costs 5'
+  );
+  // Moves in steps like a person; a single-jump hover() left the first tooltip showing.
+  const cheapest = (await standings
+    .getByRole('button', { name: 'Cheapest' })
+    .boundingBox())!;
+  await page.mouse.move(
+    cheapest.x + cheapest.width / 2,
+    cheapest.y + cheapest.height / 2,
+    { steps: 25 }
+  );
+  await expect(
+    page.getByRole('tooltip').filter({ hasText: 'cheapest possible' })
+  ).toBeVisible();
+  // The first tooltip gives way to the second rather than piling up.
+  await expect(
+    page.getByRole('tooltip').filter({ hasText: 'start cell is free' })
+  ).toHaveCount(0);
 });
 
 test('the board can be painted with the keyboard', async ({ page }) => {
